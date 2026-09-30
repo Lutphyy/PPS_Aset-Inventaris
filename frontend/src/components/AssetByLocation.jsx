@@ -1,83 +1,29 @@
-function AssetByLocation() {
-  const locations = [
-    {
-      name: 'Fakultas Teknik dan Kemaritiman',
-      total: 9,
-    },
-    {
-      name: 'Fakultas Ekonomi dan Bisnis Maritim',
-      total: 2,
-    },
-    {
-      name: 'Fakultas Ilmu Sosial dan Ilmu Politik',
-      total: 2,
-    },
-    {
-      name: 'Fakultas Kelautan dan Ilmu Perikanan',
-      total: 4,
-    },
-    {
-      name: 'Fakultas Ilmu Keguruan dan Pendidikan',
-      total: 2,
-    },
-    {
-      name: 'Fakultas Kedokteran',
-      total: 2,
-    },
-    {
-      name: 'Rektorat',
-      total: 3,
-    },
-    {
-      name: 'Perpustakaan',
-      total: 1,
-    },
-    {
-      name: 'Bagian Umum',
-      total: 5,
-    },
-  ]
-
-  const maxAsset = 9
+function AssetByLocation({ data = [] }) {
+  const maxCount = Math.max(...data.map(d => d.count), 1)
 
   return (
     <div className="asset-location-card">
-
       <div className="asset-location-header">
-        <h3>Statistik Aset per Unit / Lokasi</h3>
-
-        <button className="view-all">
-          Lihat semua
-        </button>
+        <h3>Aset per Lokasi</h3>
       </div>
-
       <div className="location-list">
-        {locations.map((location, index) => {
-          const progress = (location.total / maxAsset) * 100
-
-          return (
-            <div className="location-item" key={index}>
-
-              <span className="location-name">
-                {location.name}
-              </span>
-
+        {data.length === 0 ? (
+          <p style={{ color: '#999', fontSize: '12px' }}>Belum ada data lokasi</p>
+        ) : (
+          data.map((item, i) => (
+            <div className="location-item" key={i}>
+              <span className="location-name">{item.location}</span>
               <div className="location-bar">
                 <div
                   className="location-bar-fill"
-                  style={{ width: `${progress}%` }}
-                ></div>
+                  style={{ width: `${(item.count / maxCount) * 100}%` }}
+                />
               </div>
-
-              <strong>
-                {location.total} aset
-              </strong>
-
+              <strong>{item.count}</strong>
             </div>
-          )
-        })}
+          ))
+        )}
       </div>
-
     </div>
   )
 }

@@ -1,44 +1,21 @@
-function RecentLoans() {
-  const loans = [
-    {
-      asset: 'Laptop Lenovo ThinkPad',
-      borrower: 'Budi Santoso',
-      date: '20 Sep 2026',
-      status: 'Dipinjam',
-    },
-    {
-      asset: 'Proyektor Epson',
-      borrower: 'Siti Rahma',
-      date: '19 Sep 2026',
-      status: 'Dikembalikan',
-    },
-    {
-      asset: 'Kamera Canon EOS',
-      borrower: 'Andi Wijaya',
-      date: '18 Sep 2026',
-      status: 'Dipinjam',
-    },
-    {
-      asset: 'Printer Epson L3210',
-      borrower: 'Rina Amelia',
-      date: '17 Sep 2026',
-      status: 'Terlambat',
-    },
-  ]
+function RecentLoans({ data = [] }) {
+  const statusClass = (s) => {
+    const map = {
+      AKTIF: 'dipinjam', DISETUJUI: 'dipinjam', MENUNGGU: 'terlambat',
+      DIKEMBALIKAN: 'dikembalikan', TERLAMBAT: 'terlambat', DITOLAK: 'terlambat'
+    }
+    return map[s] || ''
+  }
+  const statusLabel = (s) => s?.replace(/_/g, ' ') || s
 
   return (
     <div className="recent-loans">
       <div className="table-header">
         <div>
           <h3>Peminjaman Terbaru</h3>
-          <p>Daftar peminjaman aset terbaru</p>
+          <p>5 peminjaman terakhir</p>
         </div>
-
-        <button className="view-all">
-          Lihat Semua
-        </button>
       </div>
-
       <div className="table-wrapper">
         <table>
           <thead>
@@ -49,24 +26,19 @@ function RecentLoans() {
               <th>Status</th>
             </tr>
           </thead>
-
           <tbody>
-            {loans.map((loan, index) => (
-              <tr key={index}>
-                <td>{loan.asset}</td>
-                <td>{loan.borrower}</td>
-                <td>{loan.date}</td>
-                <td>
-                  <span
-                    className={`loan-status ${loan.status
-                      .toLowerCase()
-                      .replace(' ', '-')}`}
-                  >
-                    {loan.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {data.length === 0 ? (
+              <tr><td colSpan="4" style={{ textAlign: 'center', color: '#999' }}>Belum ada peminjaman</td></tr>
+            ) : (
+              data.map((loan, i) => (
+                <tr key={i}>
+                  <td>{loan.asset?.name || '-'}</td>
+                  <td>{loan.borrower?.name || '-'}</td>
+                  <td>{loan.borrow_date || '-'}</td>
+                  <td><span className={`loan-status ${statusClass(loan.status)}`}>{statusLabel(loan.status)}</span></td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

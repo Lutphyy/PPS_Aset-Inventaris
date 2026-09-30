@@ -1,55 +1,63 @@
 import {
   Search,
-  Bell,
   ChevronDown,
 } from 'lucide-react'
 
-function Header() {
+function Header({ user }) {
+  const getInitials = (name) => {
+    if (!name) return 'U'
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
+  }
+
+  const getRoleName = (role) => {
+    const roleNames = {
+      'SUPER_ADMIN': 'Super Admin',
+      'ADMIN_UNIT': 'Admin Unit',
+      'OPERATOR': 'Operator',
+      'BORROWER': 'Peminjam',
+      'GUEST': 'Tamu',
+      'VIEWER': 'Viewer'
+    }
+    return roleNames[role] || role
+  }
+
   return (
     <header className="header">
-
-      {/* Search */}
+      
+      {/* SEARCH BOX */}
       <div className="search-box">
         <Search size={16} strokeWidth={1.8} />
 
         <input
           type="text"
-          placeholder="Cari aset, kode, atau peminjaman..."
+          placeholder="Cari aset, peminjaman, atau user..."
         />
       </div>
 
-
-      {/* Header Right */}
+      {/* RIGHT SECTION */}
       <div className="header-right">
 
-        {/* Notification */}
-        <button
-          className="notification"
-          type="button"
-          aria-label="Notifikasi"
-        >
-          <Bell size={17} strokeWidth={1.8} />
-        </button>
-
-
-        {/* Profile */}
+        {/* USER PROFILE */}
         <div className="profile">
-
           <div className="profile-avatar">
-            AW
+            {getInitials(user?.name)}
           </div>
 
           <div className="profile-info">
-            <strong>Andi Wijaya</strong>
-            <span>Super Admin</span>
+            <strong>{user?.name || 'User'}</strong>
+            <span>{getRoleName(user?.role)}</span>
           </div>
 
           <ChevronDown
             className="arrow"
-            size={15}
-            strokeWidth={1.8}
+            size={14}
+            strokeWidth={2}
           />
-
         </div>
 
       </div>
