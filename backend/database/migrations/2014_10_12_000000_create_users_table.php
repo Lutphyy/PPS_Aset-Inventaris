@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('phone')->nullable();
             $table->enum('role', ['SUPER_ADMIN', 'ADMIN_UNIT', 'OPERATOR', 'BORROWER', 'GUEST', 'VIEWER'])->default('BORROWER');
-            $table->string('unit')->nullable();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->onDelete('set null');
             $table->boolean('is_active')->default(true);
             $table->boolean('is_guest')->default(false);
             $table->string('identity_number')->nullable()->unique();

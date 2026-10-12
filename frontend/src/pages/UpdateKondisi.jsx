@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Wrench, Save } from 'lucide-react'
-import { assetsAPI } from '../utils/api'
+import { assetsAPI, masterDataAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
-const CONDITIONS = ['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT']
 const condLabel = (c) => c?.replace(/_/g, ' ') || c
 
 function UpdateKondisi() {
@@ -13,9 +12,11 @@ function UpdateKondisi() {
   const [editing, setEditing] = useState(null)
   const [newCond, setNewCond] = useState('')
   const [notes, setNotes] = useState('')
+  const [CONDITIONS, setConditions] = useState(['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT'])
 
   useEffect(() => {
     assetsAPI.getAll({ limit: 100 }).then(res => { setAssets(res.data || []); setLoading(false) }).catch(() => setLoading(false))
+    masterDataAPI.getAll().then(res => { if (res.data?.conditions?.length) setConditions(res.data.conditions) }).catch(() => {})
   }, [])
 
   const handleUpdate = async (id) => {
@@ -37,18 +38,19 @@ function UpdateKondisi() {
 
   return (
     <div className="asset-page">
-      <div className="asset-page-header"><div><h1>Update Kondisi</h1><p>Perbarui kondisi fisik aset</p></div></div>
+      <div className="asset-page-header"><div><h1>Update Kondisi</h1><p>Perbarui kondisi fisik aset unit Anda</p></div></div>
       <div className="asset-table-card">
         <div className="asset-table-wrapper">
           <table className="asset-table">
-            <thead><tr><th>Kode</th><th>Nama Aset</th><th>Lokasi</th><th>Kondisi Saat Ini</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Nama Aset</th><th>Unit</th><th>Lokasi</th><th>Kondisi Saat Ini</th><th>Aksi</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr> :
+              {loading ? <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr> :
                assets.map(a => (
                 <tr key={a.id}>
                   <td style={{ fontWeight: 600 }}>{a.code}</td>
                   <td>{a.name}</td>
-                  <td style={{ fontSize: '12px', color: '#666' }}>{a.location}</td>
+                  <td><span style={{ fontSize: '11px', fontWeight: 600, color: '#527bd8' }}>{a.unit?.name || '-'}</span></td>
+                  <td style={{ fontSize: '12px', color: '#666' }}>{a.location?.name || '-'}</td>
                   <td>{condBadge(a.condition)}</td>
                   <td>
                     {editing === a.id ? (

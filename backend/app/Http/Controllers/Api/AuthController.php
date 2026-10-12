@@ -19,7 +19,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'role' => 'required|in:SUPER_ADMIN,ADMIN_UNIT,OPERATOR,BORROWER,VIEWER',
-            'unit' => 'nullable|string|max:255',
+            'unit_id' => 'nullable|exists:units,id',
         ]);
 
         if ($validator->fails()) {
@@ -35,7 +35,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'phone' => $request->phone,
             'role' => $request->role,
-            'unit' => $request->unit,
+            'unit_id' => $request->unit_id,
             'is_guest' => false,
         ]);
 
@@ -54,7 +54,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Registrasi berhasil',
             'data' => [
-                'user' => $user,
+                'user' => $user->load('unit'),
                 'token' => $token
             ]
         ], 201);
@@ -136,7 +136,7 @@ class AuthController extends Controller
             ], 400);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('unit')->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -187,7 +187,7 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $request->user()
+            'data' => $request->user()->load('unit')
         ]);
     }
 
@@ -198,7 +198,6 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
-            'unit' => 'nullable|string|max:255',
             'address' => 'nullable|string',
         ]);
 
@@ -209,7 +208,7 @@ class AuthController extends Controller
             ], 400);
         }
 
-        $user->update($request->only(['name', 'phone', 'unit', 'address']));
+        $user->update($request->only(['name', 'phone', 'address']));
 
         ActivityLog::create([
             'user_id' => $user->id,
@@ -223,7 +222,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profil berhasil diupdate',
-            'data' => $user
+            'data' => $user->load('unit')
         ]);
     }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Search, X, UserCheck, Trash2, ToggleLeft, ToggleRight, UserPlus, Eye, Phone, Mail, MapPin, CreditCard, Image } from 'lucide-react'
-import { usersAPI, authAPI } from '../utils/api'
+import { Search, X, UserCheck, Trash2, ToggleLeft, ToggleRight, UserPlus, Eye, Phone, Mail, MapPin, CreditCard, Image, Building2 } from 'lucide-react'
+import { usersAPI, authAPI, unitsAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
 const CAMPUS_ROLES = ['SUPER_ADMIN', 'ADMIN_UNIT', 'OPERATOR', 'BORROWER', 'VIEWER']
@@ -9,27 +9,40 @@ const roleLabel = (r) => ({ SUPER_ADMIN: 'Super Admin', ADMIN_UNIT: 'Admin Unit'
 const roleBg = (r) => ({ SUPER_ADMIN: '#f0eafc', ADMIN_UNIT: '#e9effd', OPERATOR: '#e4f6f0', BORROWER: '#fce7e2', GUEST: '#f0eef7', VIEWER: '#f0eef7' }[r] || '#f0f0f0')
 const roleColor = (r) => ({ SUPER_ADMIN: '#7C57D6', ADMIN_UNIT: '#3E6FE0', OPERATOR: '#149E93', BORROWER: '#E85C4A', GUEST: '#8B85A3', VIEWER: '#8B85A3' }[r] || '#666')
 
-const UNITS = ['Fakultas Teknik dan Kemaritiman', 'Fakultas Ekonomi dan Bisnis Maritim', 'Fakultas Ilmu Sosial dan Ilmu Politik', 'Fakultas Kelautan dan Ilmu Perikanan', 'Fakultas Ilmu Keguruan dan Pendidikan', 'Fakultas Kedokteran', 'Rektorat', 'Perpustakaan', 'Bagian Umum']
-
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function UserRole() {
   const { toast, showConfirm } = useToast()
   const [users, setUsers] = useState([])
+  const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('Semua') // 'Semua', 'Kampus', 'Tamu'
+  const [typeFilter, setTypeFilter] = useState('Semua')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showGuestDetail, setShowGuestDetail] = useState(null) // Guest user detail modal
+  const [showGuestDetail, setShowGuestDetail] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  // Add campus user form
+  // Edit role/unit inline
+  const [editingUser, setEditingUser] = useState(null)
+  const [editRole, setEditRole] = useState('')
+  const [editUnitId, setEditUnitId] = useState('')
+
   const [newUser, setNewUser] = useState({
-    name: '', email: '', password: '', phone: '', role: 'BORROWER', unit: ''
+    name: '', email: '', password: '', phone: '', role: 'BORROWER', unit_id: ''
   })
 
-  useEffect(() => { fetchUsers() }, [])
+  useEffect(() => {
+    fetchUsers()
+    fetchUnits()
+  }, [])
+
+  const fetchUnits = async () => {
+    try {
+      const res = await unitsAPI.getAll({ active_only: true })
+      setUnits(res.data || [])
+    } catch (err) { console.error(err) }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -70,9 +83,7 @@ function UserRole() {
 
   const handleDelete = async (id, name) => {
     const confirmed = await showConfirm(`Hapus user "${name}"?`, {
-      title: 'Hapus User',
-      confirmText: 'Ya, Hapus',
-      variant: 'danger',
+      title: 'Hapus User', confirmText: 'Ya, Hapus', variant: 'danger',
     })
     if (!confirmed) return
     try { await usersAPI.delete(id); toast.success('User berhasil dihapus'); fetchUsers() }
@@ -86,18 +97,30 @@ function UserRole() {
       await authAPI.register(newUser)
       toast.success('User kampus berhasil ditambahkan!')
       setShowAddModal(false)
-      setNewUser({ name: '', email: '', password: '', phone: '', role: 'BORROWER', unit: '' })
+      setNewUser({ name: '', email: '', password: '', phone: '', role: 'BORROWER', unit_id: '' })
       fetchUsers()
     } catch (err) { toast.error('Gagal: ' + err.message) }
     finally { setSaving(false) }
   }
 
-  // View guest detail before verification
-  const handleViewGuest = (user) => {
-    setShowGuestDetail(user)
+  // Edit role/unit
+  const handleStartEdit = (u) => {
+    setEditingUser(u.id)
+    setEditRole(u.role)
+    setEditUnitId(u.unit_id || '')
   }
 
-  // Filter by type
+  const handleSaveEdit = async (id) => {
+    try {
+      await usersAPI.update(id, { role: editRole, unit_id: editUnitId || null })
+      toast.success('Role & unit berhasil diupdate')
+      setEditingUser(null)
+      fetchUsers()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleViewGuest = (user) => { setShowGuestDetail(user) }
+
   const filtered = users.filter(u => {
     if (typeFilter === 'Kampus') return !u.is_guest
     if (typeFilter === 'Tamu') return u.is_guest
@@ -113,7 +136,7 @@ function UserRole() {
       <div className="asset-page-header">
         <div>
           <h1>User & Role Management</h1>
-          <p>Kelola pengguna, hak akses, dan verifikasi tamu</p>
+          <p>Kelola pengguna, hak akses, unit assignment, dan verifikasi tamu</p>
         </div>
         <button className="add-asset-button" onClick={() => setShowAddModal(true)}>
           <UserPlus size={15} /> Tambah User Kampus
@@ -205,11 +228,32 @@ function UserRole() {
                     )}
                   </td>
                   <td>
-                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 700, background: roleBg(u.role), color: roleColor(u.role) }}>
-                      {roleLabel(u.role)}
-                    </span>
+                    {editingUser === u.id ? (
+                      <select value={editRole} onChange={e => setEditRole(e.target.value)}
+                        style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                        {CAMPUS_ROLES.filter(r => r !== 'SUPER_ADMIN').map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 700, background: roleBg(u.role), color: roleColor(u.role) }}>
+                        {roleLabel(u.role)}
+                      </span>
+                    )}
                   </td>
-                  <td style={{ fontSize: '11px', color: '#666' }}>{u.unit || '-'}</td>
+                  <td>
+                    {editingUser === u.id && editRole === 'OPERATOR' ? (
+                      <select value={editUnitId} onChange={e => setEditUnitId(e.target.value)}
+                        style={{ padding: '4px 6px', fontSize: '11px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                        <option value="">- Pilih Unit -</option>
+                        {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+                      </select>
+                    ) : editingUser === u.id ? (
+                      <span style={{ fontSize: '11px', color: '#999' }}>-</span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: u.unit ? '#527bd8' : '#999', fontWeight: u.unit ? 600 : 400 }}>
+                        {u.role === 'OPERATOR' ? (u.unit?.name || '-') : '-'}
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 600,
                       background: u.is_active ? '#e4f6f0' : '#ffe9e7', color: u.is_active ? '#299579' : '#df625d' }}>
@@ -229,33 +273,60 @@ function UserRole() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'} onClick={() => handleToggleStatus(u.id)}
-                        style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff', cursor: 'pointer', color: u.is_active ? '#df625d' : '#299579' }}>
-                        {u.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                      </button>
-                      {/* View detail button for guests */}
-                      {u.is_guest && (
-                        <button title="Lihat Detail" onClick={() => handleViewGuest(u)}
-                          style={{ padding: '5px 8px', border: '1px solid #3E6FE0', borderRadius: '6px', background: '#e9effd', cursor: 'pointer', color: '#3E6FE0' }}>
-                          <Eye size={14} />
-                        </button>
-                      )}
-                      {u.is_guest && u.verification_status !== 'TERVERIFIKASI' && u.verification_status !== 'DITOLAK' && (
+                      {editingUser === u.id ? (
                         <>
-                          <button title="Verifikasi" onClick={() => handleVerifyGuest(u.id, 'TERVERIFIKASI')}
-                            style={{ padding: '5px 8px', border: '1px solid #299579', borderRadius: '6px', background: '#e4f6f0', cursor: 'pointer', color: '#299579' }}>
-                            <UserCheck size={14} />
+                          <button title="Simpan" onClick={() => handleSaveEdit(u.id)}
+                            style={{ padding: '5px 8px', border: '1px solid #299579', borderRadius: '6px', background: '#e4f6f0', cursor: 'pointer', color: '#299579', fontSize: '11px', fontWeight: 600 }}>
+                            ✓ Simpan
                           </button>
-                          <button title="Tolak" onClick={() => handleVerifyGuest(u.id, 'DITOLAK')}
-                            style={{ padding: '5px 8px', border: '1px solid #df625d', borderRadius: '6px', background: '#ffe9e7', cursor: 'pointer', color: '#df625d' }}>
-                            <X size={14} />
+                          <button title="Batal" onClick={() => setEditingUser(null)}
+                            style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff', cursor: 'pointer', color: '#888', fontSize: '11px' }}>
+                            Batal
                           </button>
                         </>
+                      ) : (
+                        <>
+                          {/* SuperAdmin cannot be edited or deleted */}
+                          {u.role === 'SUPER_ADMIN' ? (
+                            <span style={{ fontSize: '10px', color: '#7C57D6', fontWeight: 600, padding: '4px 10px', background: '#f0eafc', borderRadius: '6px' }}>🔒 Protected</span>
+                          ) : (
+                            <>
+                              {!u.is_guest && u.role !== 'ADMIN_UNIT' && (
+                                <button title="Edit Role & Unit" onClick={() => handleStartEdit(u)}
+                                  style={{ padding: '5px 8px', border: '1px solid #527bd8', borderRadius: '6px', background: '#e9f0ff', cursor: 'pointer', color: '#527bd8' }}>
+                                  <Building2 size={14} />
+                                </button>
+                              )}
+                              <button title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'} onClick={() => handleToggleStatus(u.id)}
+                                style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff', cursor: 'pointer', color: u.is_active ? '#df625d' : '#299579' }}>
+                                {u.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                              </button>
+                              {u.is_guest && (
+                                <button title="Lihat Detail" onClick={() => handleViewGuest(u)}
+                                  style={{ padding: '5px 8px', border: '1px solid #3E6FE0', borderRadius: '6px', background: '#e9effd', cursor: 'pointer', color: '#3E6FE0' }}>
+                                  <Eye size={14} />
+                                </button>
+                              )}
+                              {u.is_guest && u.verification_status !== 'TERVERIFIKASI' && u.verification_status !== 'DITOLAK' && (
+                                <>
+                                  <button title="Verifikasi" onClick={() => handleVerifyGuest(u.id, 'TERVERIFIKASI')}
+                                    style={{ padding: '5px 8px', border: '1px solid #299579', borderRadius: '6px', background: '#e4f6f0', cursor: 'pointer', color: '#299579' }}>
+                                    <UserCheck size={14} />
+                                  </button>
+                                  <button title="Tolak" onClick={() => handleVerifyGuest(u.id, 'DITOLAK')}
+                                    style={{ padding: '5px 8px', border: '1px solid #df625d', borderRadius: '6px', background: '#ffe9e7', cursor: 'pointer', color: '#df625d' }}>
+                                    <X size={14} />
+                                  </button>
+                                </>
+                              )}
+                              <button title="Hapus" onClick={() => handleDelete(u.id, u.name)}
+                                style={{ padding: '5px 8px', border: '1px solid #df625d', borderRadius: '6px', background: '#ffe9e7', cursor: 'pointer', color: '#df625d' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </>
                       )}
-                      <button title="Hapus" onClick={() => handleDelete(u.id, u.name)}
-                        style={{ padding: '5px 8px', border: '1px solid #df625d', borderRadius: '6px', background: '#ffe9e7', cursor: 'pointer', color: '#df625d' }}>
-                        <Trash2 size={14} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -265,7 +336,7 @@ function UserRole() {
         </div>
       </div>
 
-      {/* Guest Detail Review Modal */}
+      {/* Guest Detail Modal */}
       {showGuestDetail && (
         <div className="modal-overlay" onClick={() => setShowGuestDetail(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
@@ -274,15 +345,9 @@ function UserRole() {
               <button onClick={() => setShowGuestDetail(null)}><X size={20} /></button>
             </div>
             <div className="modal-body" style={{ padding: '1.5rem' }}>
-              {/* Status Badge */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '42px', height: '42px', borderRadius: '50%',
-                    background: '#f0eef7', color: '#8B85A3',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '16px', fontWeight: 700,
-                  }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#f0eef7', color: '#8B85A3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700 }}>
                     {showGuestDetail.name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <div>
@@ -300,36 +365,22 @@ function UserRole() {
                   )}
                 </div>
               </div>
-
-              {/* Data Fields */}
               <div style={{ background: '#f8f8fa', borderRadius: '12px', padding: '16px', display: 'grid', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Mail size={15} color="#888" />
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>EMAIL</div>
-                    <div style={{ fontSize: '13px', color: '#292936' }}>{showGuestDetail.email}</div>
-                  </div>
+                  <div><div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>EMAIL</div><div style={{ fontSize: '13px', color: '#292936' }}>{showGuestDetail.email}</div></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Phone size={15} color="#888" />
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>NO. TELEPON</div>
-                    <div style={{ fontSize: '13px', color: '#292936' }}>{showGuestDetail.phone || '-'}</div>
-                  </div>
+                  <div><div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>NO. TELEPON</div><div style={{ fontSize: '13px', color: '#292936' }}>{showGuestDetail.phone || '-'}</div></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <CreditCard size={15} color="#888" />
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>NO. KTP / NIK</div>
-                    <div style={{ fontSize: '13px', color: '#292936', fontFamily: 'monospace', letterSpacing: '1px' }}>{showGuestDetail.identity_number || '-'}</div>
-                  </div>
+                  <div><div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>NO. KTP / NIK</div><div style={{ fontSize: '13px', color: '#292936', fontFamily: 'monospace', letterSpacing: '1px' }}>{showGuestDetail.identity_number || '-'}</div></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <MapPin size={15} color="#888" style={{ marginTop: '2px' }} />
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>ALAMAT</div>
-                    <div style={{ fontSize: '13px', color: '#292936', lineHeight: 1.5 }}>{showGuestDetail.address || '-'}</div>
-                  </div>
+                  <div><div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>ALAMAT</div><div style={{ fontSize: '13px', color: '#292936', lineHeight: 1.5 }}>{showGuestDetail.address || '-'}</div></div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
@@ -337,52 +388,28 @@ function UserRole() {
                     <div style={{ fontSize: '10px', color: '#999', fontWeight: 600 }}>FOTO KTP / IDENTITAS</div>
                   </div>
                   {showGuestDetail.identity_photo ? (
-                    <div style={{
-                      border: '2px solid #eee',
-                      borderRadius: '10px',
-                      overflow: 'hidden',
-                      background: '#f0f0f0',
-                    }}>
-                      <img
-                        src={`${API_BASE}${showGuestDetail.identity_photo}`}
-                        alt="Foto KTP"
+                    <div style={{ border: '2px solid #eee', borderRadius: '10px', overflow: 'hidden', background: '#f0f0f0' }}>
+                      <img src={`${API_BASE}${showGuestDetail.identity_photo}`} alt="Foto KTP"
                         style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', display: 'block' }}
-                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
-                      />
-                      <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', padding: '30px', color: '#999', fontSize: '12px' }}>
-                        Foto tidak dapat ditampilkan
-                      </div>
+                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                      <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', padding: '30px', color: '#999', fontSize: '12px' }}>Foto tidak dapat ditampilkan</div>
                     </div>
                   ) : (
-                    <div style={{
-                      padding: '24px',
-                      background: '#f5f5f7',
-                      borderRadius: '10px',
-                      textAlign: 'center',
-                      color: '#999',
-                      fontSize: '12px',
-                    }}>
-                      Tidak ada foto KTP yang diupload
-                    </div>
+                    <div style={{ padding: '24px', background: '#f5f5f7', borderRadius: '10px', textAlign: 'center', color: '#999', fontSize: '12px' }}>Tidak ada foto KTP yang diupload</div>
                   )}
                 </div>
               </div>
-
-              {/* Registration Date */}
               <div style={{ marginTop: '12px', fontSize: '11px', color: '#999', textAlign: 'right' }}>
                 Terdaftar: {showGuestDetail.created_at ? new Date(showGuestDetail.created_at).toLocaleString('id-ID') : '-'}
               </div>
             </div>
-
-            {/* Action buttons for pending guests */}
             {showGuestDetail.is_guest && showGuestDetail.verification_status !== 'TERVERIFIKASI' && showGuestDetail.verification_status !== 'DITOLAK' && (
               <div style={{ padding: '12px 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #eee' }}>
                 <button onClick={() => handleVerifyGuest(showGuestDetail.id, 'DITOLAK')}
                   style={{ padding: '9px 18px', border: '1px solid #df625d', borderRadius: '8px', background: '#ffe9e7', cursor: 'pointer', color: '#df625d', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <X size={14} /> Tolak
                 </button>
-                <button onClick={() => handleVerifyGuest(showGuestDetail.id, 'TERVERIFIKASI')}
-                  className="add-asset-button"
+                <button onClick={() => handleVerifyGuest(showGuestDetail.id, 'TERVERIFIKASI')} className="add-asset-button"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <UserCheck size={14} /> Verifikasi
                 </button>
@@ -403,9 +430,8 @@ function UserRole() {
             <form onSubmit={handleAddCampusUser}>
               <div className="modal-body" style={{ padding: '1.5rem' }}>
                 <div style={{ background: '#e4f6f0', padding: '12px 14px', borderRadius: '8px', fontSize: '12px', color: '#0B6A62', marginBottom: '16px', lineHeight: 1.5 }}>
-                  🎓 <strong>User Kampus</strong> (dosen, mahasiswa, staff) otomatis mendapat diskon {50}% untuk peminjaman aset. Tidak perlu verifikasi KTP.
+                  🎓 <strong>User Kampus</strong> (dosen, mahasiswa, staff) otomatis mendapat diskon 50% untuk peminjaman aset. Tidak perlu verifikasi KTP.
                 </div>
-
                 <div style={{ display: 'grid', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>Nama Lengkap *</label>
@@ -439,12 +465,18 @@ function UserRole() {
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>Unit Kerja *</label>
-                    <select value={newUser.unit} onChange={e => setNewUser({...newUser, unit: e.target.value})} required
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>
+                      Unit {newUser.role === 'OPERATOR' ? '*' : '(opsional)'}
+                    </label>
+                    <select value={newUser.unit_id} onChange={e => setNewUser({...newUser, unit_id: e.target.value})}
+                      required={newUser.role === 'OPERATOR'}
                       style={{ width: '100%', padding: '9px 12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }}>
-                      <option value="">Pilih Unit</option>
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      <option value="">- Tanpa Unit -</option>
+                      {units.map(u => <option key={u.id} value={u.id}>{u.name} ({u.code})</option>)}
                     </select>
+                    {newUser.role === 'OPERATOR' && (
+                      <div style={{ fontSize: '10px', color: '#d79b32', marginTop: '4px' }}>⚠️ Operator wajib memiliki unit yang ditentukan</div>
+                    )}
                   </div>
                 </div>
               </div>

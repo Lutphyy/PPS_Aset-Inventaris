@@ -18,7 +18,16 @@ class LoanController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Loan::with(['asset', 'borrower', 'agreement', 'payment']);
+        $query = Loan::with(['asset.unit', 'asset.location', 'borrower', 'agreement', 'payment']);
+
+        $user = auth()->user();
+
+        // Operator only sees loans for assets in their unit
+        if ($user->isOperator() && $user->unit_id) {
+            $query->whereHas('asset', function($q) use ($user) {
+                $q->where('unit_id', $user->unit_id);
+            });
+        }
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -30,6 +39,12 @@ class LoanController extends Controller
 
         if ($request->has('asset_id')) {
             $query->where('asset_id', $request->asset_id);
+        }
+
+        if ($request->has('unit_id')) {
+            $query->whereHas('asset', function($q) use ($request) {
+                $q->where('unit_id', $request->unit_id);
+            });
         }
 
         $page = $request->get('page', 1);
@@ -51,7 +66,7 @@ class LoanController extends Controller
 
     public function show($id)
     {
-        $loan = Loan::with(['asset', 'borrower', 'agreement', 'payment', 'createdBy'])->find($id);
+        $loan = Loan::with(['asset.unit', 'asset.location', 'borrower', 'agreement', 'payment', 'createdBy'])->find($id);
 
         if (!$loan) {
             return response()->json([
@@ -83,7 +98,7 @@ class LoanController extends Controller
             ], 400);
         }
 
-        $asset = Asset::find($request->asset_id);
+        $asset = Asset::with('unit')->find($request->asset_id);
 
         if ($asset->status !== 'TERSEDIA') {
             return response()->json([
@@ -147,20 +162,20 @@ class LoanController extends Controller
             'action' => 'CREATE_LOAN',
             'entity' => 'Loan',
             'entity_id' => $loan->id,
-            'description' => "{$borrower->name} mengajukan peminjaman {$asset->name}",
+            'description' => "{$borrower->name} mengajukan peminjaman {$asset->name} (Unit: {$asset->unit->name})",
             'ip_address' => $request->ip(),
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Permintaan peminjaman berhasil dibuat. Menunggu approval admin.',
-            'data' => $loan->load(['asset', 'borrower'])
+            'data' => $loan->load(['asset.unit', 'borrower'])
         ], 201);
     }
 
     public function approve(Request $request, $id)
     {
-        $loan = Loan::with(['asset', 'borrower'])->find($id);
+        $loan = Loan::with(['asset.unit', 'borrower'])->find($id);
 
         if (!$loan) {
             return response()->json([
@@ -176,6 +191,15 @@ class LoanController extends Controller
             ], 400);
         }
 
+        // Operator can only approve loans for assets in their unit
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $loan->asset->unit_id !== $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk menyetujui peminjaman ini'
+            ], 403);
+        }
+
         $loan->update([
             'status' => 'DISETUJUI',
             'approved_at' => now(),
@@ -186,7 +210,7 @@ class LoanController extends Controller
         $loan->asset->update(['status' => 'DIPINJAM']);
 
         ActivityLog::create([
-            'user_id' => auth()->id,
+            'user_id' => auth()->id(),
             'action' => 'APPROVE_LOAN',
             'entity' => 'Loan',
             'entity_id' => $loan->id,
@@ -197,7 +221,7 @@ class LoanController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Peminjaman berhasil disetujui',
-            'data' => $loan->load(['asset', 'borrower'])
+            'data' => $loan->load(['asset.unit', 'borrower'])
         ]);
     }
 
@@ -214,7 +238,7 @@ class LoanController extends Controller
             ], 400);
         }
 
-        $loan = Loan::with(['asset', 'borrower'])->find($id);
+        $loan = Loan::with(['asset.unit', 'borrower'])->find($id);
 
         if (!$loan) {
             return response()->json([
@@ -264,7 +288,7 @@ class LoanController extends Controller
             ], 400);
         }
 
-        $loan = Loan::with(['asset', 'borrower'])->find($id);
+        $loan = Loan::with(['asset.unit', 'borrower'])->find($id);
 
         if (!$loan) {
             return response()->json([
@@ -340,7 +364,7 @@ class LoanController extends Controller
 
     public function myLoans(Request $request)
     {
-        $query = Loan::with(['asset', 'agreement', 'payment'])
+        $query = Loan::with(['asset.unit', 'asset.location', 'agreement', 'payment'])
             ->where('borrower_id', auth()->id());
 
         if ($request->has('status')) {
@@ -357,6 +381,9 @@ class LoanController extends Controller
 
     private function generateAgreementText($loan, $asset, $borrower)
     {
+        $unitName = $asset->unit ? $asset->unit->name : '-';
+        $locationName = $asset->location ? $asset->location->name : '-';
+
         return "
 PERJANJIAN PEMINJAMAN ASET
 
@@ -370,13 +397,14 @@ Universitas
 PIHAK KEDUA (PEMINJAM):
 Nama: {$borrower->name}
 Email: {$borrower->email}
-" . ($borrower->is_guest ? "No. KTP: {$borrower->identity_number}" : "Unit: {$borrower->unit}") . "
+" . ($borrower->is_guest ? "No. KTP: {$borrower->identity_number}" : "Unit: {$unitName}") . "
 
 ASET YANG DIPINJAM:
 - Kode: {$asset->code}
 - Nama: {$asset->name}
 - Kategori: {$asset->category}
-- Lokasi: {$asset->location}
+- Unit: {$unitName}
+- Lokasi: {$locationName}
 
 KETENTUAN PEMINJAMAN:
 1. Tanggal Pinjam: " . Carbon::parse($loan->borrow_date)->format('d-m-Y') . "

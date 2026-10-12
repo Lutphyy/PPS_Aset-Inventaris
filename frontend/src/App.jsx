@@ -22,22 +22,33 @@ import PengaturanBiaya from './pages/PengaturanBiaya'
 import UpdateKondisi from './pages/UpdateKondisi'
 import UpdateLokasi from './pages/UpdateLokasi'
 import Login from './pages/Login'
+import KelolaUnit from './pages/KelolaUnit'
+import KelolaMaster from './pages/KelolaMaster'
 
 import { dashboardAPI } from './utils/api'
 
 function App() {
+  const getDefaultPage = (role) => {
+    if (['SUPER_ADMIN', 'ADMIN_UNIT', 'OPERATOR'].includes(role)) return 'dashboard'
+    if (role === 'VIEWER') return 'data-aset'
+    return 'daftar-aset' // BORROWER, GUEST
+  }
+
   const [activePage, setActivePage] = useState('dashboard')
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedAssetId, setSelectedAssetId] = useState(null)
   const [badgeCounts, setBadgeCounts] = useState({})
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
     const token = localStorage.getItem('token')
 
     if (storedUser && token) {
-      setUser(JSON.parse(storedUser))
+      const parsed = JSON.parse(storedUser)
+      setUser(parsed)
+      setActivePage(getDefaultPage(parsed.role))
     }
     setLoading(false)
   }, [])
@@ -47,19 +58,16 @@ function App() {
     if (!user) return
     try {
       const res = await dashboardAPI.getStats()
-      console.log('[BADGE DEBUG] API response:', JSON.stringify(res))
       const data = res.data?.overview || {}
-      console.log('[BADGE DEBUG] overview:', JSON.stringify(data))
       const counts = {}
 
       // Map dashboard stats to menu item IDs
       if (data.pendingLoans > 0) counts['peminjaman'] = data.pendingLoans
       if (data.pendingGuestVerifications > 0) counts['user-role'] = data.pendingGuestVerifications
 
-      console.log('[BADGE DEBUG] final counts:', JSON.stringify(counts))
       setBadgeCounts(counts)
     } catch (err) {
-      console.error('[BADGE DEBUG] Error:', err)
+      console.error('[BADGE] Error:', err)
     }
   }, [user])
 
@@ -79,6 +87,7 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData)
+    setActivePage(getDefaultPage(userData.role))
   }
 
   const handleLogout = () => {
@@ -93,6 +102,13 @@ function App() {
   const handleNavigate = (page, assetId) => {
     setActivePage(page)
     if (assetId) setSelectedAssetId(assetId)
+    setSidebarOpen(false) // close sidebar on mobile
+  }
+
+  // Wrap setActivePage to also close sidebar on mobile
+  const handleSetActivePage = (page) => {
+    setActivePage(page)
+    setSidebarOpen(false)
   }
 
   const renderPage = () => {
@@ -129,6 +145,10 @@ function App() {
         return <UpdateKondisi />
       case 'update-lokasi':
         return <UpdateLokasi />
+      case 'kelola-unit':
+        return <KelolaUnit />
+      case 'kelola-master':
+        return <KelolaMaster />
       default:
         return <Dashboard />
     }
@@ -156,16 +176,27 @@ function App() {
   return (
     <ToastProvider>
       <div className="app">
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+        )}
+
         <Sidebar
           activePage={activePage}
-          setActivePage={setActivePage}
+          setActivePage={handleSetActivePage}
           user={user}
           onLogout={handleLogout}
           badgeCounts={badgeCounts}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         <main className="main-content">
-          <Header user={user} onLogout={handleLogout} />
+          <Header
+            user={user}
+            onLogout={handleLogout}
+            onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+          />
           {renderPage()}
         </main>
       </div>

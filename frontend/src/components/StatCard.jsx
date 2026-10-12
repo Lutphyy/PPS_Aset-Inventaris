@@ -1,8 +1,8 @@
-function StatCard({ title, value, icon, color, description }) {
+function StatCard({ title, value, icon: Icon, color, description }) {
   return (
     <div className="stat-card">
       <div className={`stat-icon ${color}`}>
-        {icon}
+        {typeof Icon === 'string' ? Icon : <Icon size={20} strokeWidth={1.8} />}
       </div>
 
       <div className="stat-content">

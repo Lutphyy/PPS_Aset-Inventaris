@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Send, AlertTriangle } from 'lucide-react'
-import { assetsAPI, loansAPI } from '../utils/api'
+import { Send, AlertTriangle, Building2 } from 'lucide-react'
+import { assetsAPI, loansAPI, unitsAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
 const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
@@ -8,9 +8,11 @@ const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
 function AjukanPeminjaman({ selectedAssetId }) {
   const { toast } = useToast()
   const [assets, setAssets] = useState([])
+  const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [selectedUnitId, setSelectedUnitId] = useState('')
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const isGuest = user.role === 'GUEST'
   const discountPercent = isGuest ? 0 : 50
@@ -23,11 +25,38 @@ function AjukanPeminjaman({ selectedAssetId }) {
   })
 
   useEffect(() => {
-    assetsAPI.getAll({ status: 'TERSEDIA', limit: 100 }).then(res => {
+    unitsAPI.getAll({ active_only: true }).then(res => {
+      setUnits(res.data || [])
+    })
+    // If selectedAssetId is pre-selected, load its unit's assets
+    if (selectedAssetId) {
+      assetsAPI.getById(selectedAssetId).then(res => {
+        const asset = res.data
+        if (asset) {
+          setSelectedUnitId(asset.unit_id)
+          assetsAPI.getAll({ status: 'TERSEDIA', unit_id: asset.unit_id, limit: 100 }).then(r => {
+            setAssets(r.data || [])
+            setLoading(false)
+          })
+        }
+      }).catch(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleUnitSelect = async (unitId) => {
+    setSelectedUnitId(unitId)
+    setForm(prev => ({ ...prev, asset_id: '' }))
+    if (unitId) {
+      setLoading(true)
+      const res = await assetsAPI.getAll({ status: 'TERSEDIA', unit_id: unitId, limit: 100 })
       setAssets(res.data || [])
       setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [])
+    } else {
+      setAssets([])
+    }
+  }
 
   const selectedAsset = assets.find(a => String(a.id) === String(form.asset_id))
   const days = form.borrow_date && form.estimated_return_date
@@ -55,7 +84,7 @@ function AjukanPeminjaman({ selectedAssetId }) {
   return (
     <div className="asset-page">
       <div className="asset-page-header">
-        <div><h1>Ajukan Peminjaman</h1><p>Isi form untuk mengajukan peminjaman aset</p></div>
+        <div><h1>Ajukan Peminjaman</h1><p>Pilih unit, lalu pilih aset yang ingin dipinjam</p></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', maxWidth: '900px' }}>
@@ -63,14 +92,27 @@ function AjukanPeminjaman({ selectedAssetId }) {
         <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '14px', padding: '24px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '15px' }}>Form Peminjaman</h3>
           <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '14px' }}>
+            {/* Unit Selection */}
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>Pilih Unit / Prodi *</label>
+              <select value={selectedUnitId} onChange={(e) => handleUnitSelect(e.target.value)} required
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }}>
+                <option value="">-- Pilih unit --</option>
+                {units.map(u => <option key={u.id} value={u.id}>{u.name} ({u.code})</option>)}
+              </select>
+            </div>
+
+            {/* Asset Selection */}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>Pilih Aset *</label>
               <select value={form.asset_id} onChange={(e) => setForm({ ...form, asset_id: e.target.value })} required
+                disabled={!selectedUnitId}
                 style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }}>
-                <option value="">-- Pilih aset --</option>
+                <option value="">{!selectedUnitId ? '-- Pilih unit dulu --' : '-- Pilih aset --'}</option>
                 {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code}) - {fmtIDR(a.rental_price_per_day)}/hari</option>)}
               </select>
             </div>
+
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#666', display: 'block', marginBottom: '4px' }}>Tujuan Peminjaman *</label>
               <textarea value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} required rows="3"
@@ -125,6 +167,10 @@ function AjukanPeminjaman({ selectedAssetId }) {
           <h3 style={{ margin: '0 0 16px', fontSize: '15px' }}>💰 Rincian Biaya</h3>
           {selectedAsset && days > 0 ? (
             <div style={{ display: 'grid', gap: '10px' }}>
+              <div style={{ background: '#f0f4ff', padding: '10px', borderRadius: '8px', fontSize: '12px', color: '#527bd8', fontWeight: 600 }}>
+                <Building2 size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                Unit: {selectedAsset.unit?.name || '-'}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Biaya sewa/hari</span><span>{fmtIDR(selectedAsset.rental_price_per_day)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Durasi</span><span>{days} hari</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Subtotal</span><span>{fmtIDR(rentalTotal)}</span></div>
@@ -145,7 +191,7 @@ function AjukanPeminjaman({ selectedAssetId }) {
               )}
             </div>
           ) : (
-            <p style={{ color: '#999', fontSize: '12px' }}>Pilih aset dan tanggal untuk melihat rincian biaya</p>
+            <p style={{ color: '#999', fontSize: '12px' }}>Pilih unit, aset, dan tanggal untuk melihat rincian biaya</p>
           )}
         </div>
       </div>

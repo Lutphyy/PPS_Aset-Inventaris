@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\User;
 use App\Models\Loan;
 use App\Models\Payment;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -14,21 +15,35 @@ class DashboardController extends Controller
 {
     public function stats(Request $request)
     {
+        $user = auth()->user();
+        $isOperator = $user->isOperator() && $user->unit_id;
+
+        // Base queries scoped by unit for operators
+        $assetQuery = Asset::query();
+        $loanQuery = Loan::query();
+
+        if ($isOperator) {
+            $assetQuery->where('unit_id', $user->unit_id);
+            $loanQuery->whereHas('asset', function($q) use ($user) {
+                $q->where('unit_id', $user->unit_id);
+            });
+        }
+
         // Total assets
-        $totalAssets = Asset::count();
+        $totalAssets = (clone $assetQuery)->count();
 
         // Assets by status
-        $assetsByStatus = Asset::selectRaw('status, COUNT(*) as count')
+        $assetsByStatus = (clone $assetQuery)->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status');
 
         // Assets by condition
-        $assetsByCondition = Asset::selectRaw('`condition`, COUNT(*) as count')
+        $assetsByCondition = (clone $assetQuery)->selectRaw('`condition`, COUNT(*) as count')
             ->groupBy('condition')
             ->pluck('count', 'condition');
 
         // Assets by category
-        $assetsByCategory = Asset::selectRaw('category, COUNT(*) as count')
+        $assetsByCategory = (clone $assetQuery)->selectRaw('category, COUNT(*) as count')
             ->groupBy('category')
             ->get()
             ->map(function ($item) {
@@ -38,38 +53,47 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Assets by location
-        $assetsByLocation = Asset::selectRaw('location, COUNT(*) as count')
-            ->groupBy('location')
-            ->get()
-            ->map(function ($item) {
+        // Assets by unit (only for admin roles)
+        $assetsByUnit = [];
+        if (!$isOperator) {
+            $assetsByUnit = Unit::withCount('assets')->get()->map(function ($unit) {
                 return [
-                    'location' => $item->location,
-                    'count' => $item->count
+                    'unit' => $unit->name,
+                    'unit_code' => $unit->code,
+                    'count' => $unit->assets_count,
                 ];
             });
+        }
 
         // Total users
-        $totalUsers = User::count();
+        $totalUsers = $isOperator ? 0 : User::count();
 
         // Active loans
-        $activeLoans = Loan::whereIn('status', ['DISETUJUI', 'AKTIF'])->count();
+        $activeLoans = (clone $loanQuery)->whereIn('status', ['DISETUJUI', 'AKTIF'])->count();
 
         // Pending loans
-        $pendingLoans = Loan::where('status', 'MENUNGGU')->count();
+        $pendingLoans = (clone $loanQuery)->where('status', 'MENUNGGU')->count();
 
         // Recent loans
-        $recentLoans = Loan::with(['asset', 'borrower'])
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
+        $recentLoansQuery = Loan::with(['asset.unit', 'borrower']);
+        if ($isOperator) {
+            $recentLoansQuery->whereHas('asset', function($q) use ($user) {
+                $q->where('unit_id', $user->unit_id);
+            });
+        }
+        $recentLoans = $recentLoansQuery->orderBy('created_at', 'desc')->limit(5)->get();
 
         // Upcoming due dates (next 7 days)
-        $upcomingDue = Loan::with(['asset', 'borrower'])
+        $upcomingDueQuery = Loan::with(['asset.unit', 'borrower'])
             ->whereIn('status', ['DISETUJUI', 'AKTIF'])
             ->where('estimated_return_date', '<=', Carbon::now()->addDays(7))
-            ->orderBy('estimated_return_date', 'asc')
-            ->get();
+            ->orderBy('estimated_return_date', 'asc');
+        if ($isOperator) {
+            $upcomingDueQuery->whereHas('asset', function($q) use ($user) {
+                $q->where('unit_id', $user->unit_id);
+            });
+        }
+        $upcomingDue = $upcomingDueQuery->get();
 
         // Revenue - this month
         $thisMonthStart = Carbon::now()->startOfMonth();
@@ -100,7 +124,7 @@ class DashboardController extends Controller
                 'assetsByStatus' => $assetsByStatus,
                 'assetsByCondition' => $assetsByCondition,
                 'assetsByCategory' => $assetsByCategory,
-                'assetsByLocation' => $assetsByLocation,
+                'assetsByUnit' => $assetsByUnit,
                 'recentLoans' => $recentLoans,
                 'upcomingDue' => $upcomingDue,
             ]

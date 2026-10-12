@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Undo2, X, Eye } from 'lucide-react'
-import { loansAPI } from '../utils/api'
+import { loansAPI, masterDataAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
 const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
-const CONDITIONS = ['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT']
 const condLabel = (c) => c?.replace(/_/g, ' ') || c
 
 function Pengembalian() {
@@ -14,8 +13,12 @@ function Pengembalian() {
   const [showReturnModal, setShowReturnModal] = useState(null)
   const [returnCondition, setReturnCondition] = useState('BAIK')
   const [returnNotes, setReturnNotes] = useState('')
+  const [CONDITIONS, setConditions] = useState(['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT'])
 
-  useEffect(() => { fetchLoans() }, [])
+  useEffect(() => {
+    fetchLoans()
+    masterDataAPI.getAll().then(res => { if (res.data?.conditions?.length) setConditions(res.data.conditions) }).catch(() => { })
+  }, [])
 
   const fetchLoans = async () => {
     try {

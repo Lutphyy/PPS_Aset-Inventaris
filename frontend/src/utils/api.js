@@ -104,6 +104,38 @@ export const authAPI = {
     })
 }
 
+// Units API
+export const unitsAPI = {
+  getAll: (params = {}) => apiFetch(`/units-list${buildQuery(params)}`),
+
+  getById: (id) => apiFetch(`/units/${id}`),
+
+  create: (data) =>
+    apiFetch('/units', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id, data) =>
+    apiFetch(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  delete: (id) =>
+    apiFetch(`/units/${id}`, { method: 'DELETE' }),
+}
+
+// Locations API
+export const locationsAPI = {
+  getAll: (params = {}) => apiFetch(`/locations-list${buildQuery(params)}`),
+
+  getById: (id) => apiFetch(`/locations/${id}`),
+
+  create: (data) =>
+    apiFetch('/locations', { method: 'POST', body: JSON.stringify(data) }),
+
+  update: (id, data) =>
+    apiFetch(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  delete: (id) =>
+    apiFetch(`/locations/${id}`, { method: 'DELETE' }),
+}
+
 // Assets API
 export const assetsAPI = {
   getAll: (params = {}) => apiFetch(`/assets${buildQuery(params)}`),
@@ -136,6 +168,12 @@ export const assetsAPI = {
     apiFetch(`/assets/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, notes })
+    }),
+
+  transfer: (id, data) =>
+    apiFetch(`/assets/${id}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     }),
 
   delete: (id) =>
@@ -205,6 +243,14 @@ export const dashboardAPI = {
   getStats: () => apiFetch('/dashboard/stats')
 }
 
+// Master Data API (Categories, Conditions, Statuses)
+export const masterDataAPI = {
+  getAll: () => apiFetch('/master-data'),
+  updateCategories: (items) => apiFetch('/master-data/categories', { method: 'PUT', body: JSON.stringify({ items }) }),
+  updateConditions: (items) => apiFetch('/master-data/conditions', { method: 'PUT', body: JSON.stringify({ items }) }),
+  updateStatuses: (items) => apiFetch('/master-data/statuses', { method: 'PUT', body: JSON.stringify({ items }) }),
+}
+
 // Agreements API
 export const agreementsAPI = {
   getAll: (params = {}) => apiFetch(`/agreements${buildQuery(params)}`),
@@ -267,6 +313,7 @@ export const activityLogsAPI = {
 }
 
 export default {
-  authAPI, assetsAPI, loansAPI, usersAPI, dashboardAPI,
+  authAPI, assetsAPI, loansAPI, usersAPI, dashboardAPI, masterDataAPI,
   agreementsAPI, paymentsAPI, reportsAPI, activityLogsAPI,
+  unitsAPI, locationsAPI,
 }

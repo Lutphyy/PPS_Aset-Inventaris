@@ -14,14 +14,13 @@ return new class extends Migration
             $table->string('name');
             $table->string('category');
             $table->text('description')->nullable();
-            $table->string('unit');
-            $table->string('location');
-            $table->string('floor')->nullable();
+            $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
+            $table->foreignId('location_id')->constrained('locations')->onDelete('cascade');
             $table->integer('purchase_year')->nullable();
             $table->decimal('purchase_price', 12, 2)->nullable();
             $table->decimal('rental_price_per_day', 10, 2)->default(0);
             $table->string('photo')->nullable();
-            $table->enum('status', ['TERSEDIA', 'DIPINJAM', 'DALAM_PERBAIKAN', 'RUSAK', 'DIHAPUSKAN'])->default('TERSEDIA');
+            $table->enum('status', ['TERSEDIA', 'DIPINJAM', 'DALAM_PERBAIKAN', 'RUSAK', 'DIPINDAHKAN', 'DIMUSNAHKAN'])->default('TERSEDIA');
             $table->enum('condition', ['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT'])->default('BAIK');
             $table->text('notes')->nullable();
             

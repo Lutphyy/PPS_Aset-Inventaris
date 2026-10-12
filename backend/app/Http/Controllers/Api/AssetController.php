@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\AssetTransfer;
 use App\Models\ConditionHistory;
 use App\Models\StatusHistory;
 use App\Models\ActivityLog;
@@ -12,9 +13,31 @@ use Illuminate\Support\Facades\Validator;
 
 class AssetController extends Controller
 {
+    /**
+     * Get the unit scope for the current user.
+     * SuperAdmin/Admin Unit see all, Operator sees only their unit.
+     */
+    private function applyUnitScope($query, $request)
+    {
+        $user = auth()->user();
+
+        if ($user->isOperator() && $user->unit_id) {
+            // Operator only sees assets in their own unit
+            $query->where('unit_id', $user->unit_id);
+        } elseif ($request->has('unit_id') && $request->unit_id) {
+            // Optional filter by unit_id (for admins or borrowers selecting a unit)
+            $query->where('unit_id', $request->unit_id);
+        }
+
+        return $query;
+    }
+
     public function index(Request $request)
     {
-        $query = Asset::with(['createdBy', 'updatedBy']);
+        $query = Asset::with(['createdBy', 'updatedBy', 'unit', 'location']);
+
+        // Apply unit scoping
+        $this->applyUnitScope($query, $request);
 
         // Filters
         if ($request->has('search')) {
@@ -37,12 +60,8 @@ class AssetController extends Controller
             $query->where('condition', $request->condition);
         }
 
-        if ($request->has('location')) {
-            $query->where('location', 'LIKE', "%{$request->location}%");
-        }
-
-        if ($request->has('unit')) {
-            $query->where('unit', 'LIKE', "%{$request->unit}%");
+        if ($request->has('location_id')) {
+            $query->where('location_id', $request->location_id);
         }
 
         // Pagination
@@ -65,13 +84,22 @@ class AssetController extends Controller
 
     public function show($id)
     {
-        $asset = Asset::with(['createdBy', 'updatedBy', 'loans.borrower'])->find($id);
+        $asset = Asset::with(['createdBy', 'updatedBy', 'unit', 'location', 'loans.borrower', 'transfers.fromUnit', 'transfers.toUnit'])->find($id);
 
         if (!$asset) {
             return response()->json([
                 'success' => false,
                 'message' => 'Aset tidak ditemukan'
             ], 404);
+        }
+
+        // Check unit access for operator
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $asset->unit_id !== $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses ke aset ini'
+            ], 403);
         }
 
         return response()->json([
@@ -86,8 +114,8 @@ class AssetController extends Controller
             'code' => 'required|string|unique:assets,code',
             'name' => 'required|string|max:255',
             'category' => 'required|string|max:255',
-            'unit' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
+            'unit_id' => 'required|exists:units,id',
+            'location_id' => 'required|exists:locations,id',
             'rental_price_per_day' => 'required|numeric|min:0',
             'photo' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
         ]);
@@ -97,6 +125,15 @@ class AssetController extends Controller
                 'success' => false,
                 'errors' => $validator->errors()
             ], 400);
+        }
+
+        // Operator can only add assets to their own unit
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $request->unit_id != $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda hanya bisa menambahkan aset ke unit Anda sendiri'
+            ], 403);
         }
 
         // Handle file upload
@@ -113,9 +150,8 @@ class AssetController extends Controller
             'name' => $request->name,
             'category' => $request->category,
             'description' => $request->description,
-            'unit' => $request->unit,
-            'location' => $request->location,
-            'floor' => $request->floor,
+            'unit_id' => $request->unit_id,
+            'location_id' => $request->location_id,
             'purchase_year' => $request->purchase_year,
             'purchase_price' => $request->purchase_price,
             'rental_price_per_day' => $request->rental_price_per_day ?? 0,
@@ -155,7 +191,7 @@ class AssetController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Aset berhasil ditambahkan',
-            'data' => $asset->load('createdBy')
+            'data' => $asset->load(['createdBy', 'unit', 'location'])
         ], 201);
     }
 
@@ -170,9 +206,20 @@ class AssetController extends Controller
             ], 404);
         }
 
+        // Operator can only update assets in their unit
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $asset->unit_id !== $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk mengubah aset ini'
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'code' => 'nullable|string|unique:assets,code,' . $id,
             'name' => 'nullable|string|max:255',
+            'unit_id' => 'nullable|exists:units,id',
+            'location_id' => 'nullable|exists:locations,id',
             'rental_price_per_day' => 'nullable|numeric|min:0',
             'photo' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
         ]);
@@ -185,8 +232,8 @@ class AssetController extends Controller
         }
 
         $updateData = $request->only([
-            'code', 'name', 'category', 'description', 'unit', 
-            'location', 'floor', 'purchase_year', 'purchase_price',
+            'code', 'name', 'category', 'description', 'unit_id',
+            'location_id', 'purchase_year', 'purchase_price',
             'rental_price_per_day', 'notes'
         ]);
 
@@ -214,7 +261,7 @@ class AssetController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Aset berhasil diupdate',
-            'data' => $asset->load(['createdBy', 'updatedBy'])
+            'data' => $asset->load(['createdBy', 'updatedBy', 'unit', 'location'])
         ]);
     }
 
@@ -238,6 +285,15 @@ class AssetController extends Controller
                 'success' => false,
                 'message' => 'Aset tidak ditemukan'
             ], 404);
+        }
+
+        // Operator unit check
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $asset->unit_id !== $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses ke aset ini'
+            ], 403);
         }
 
         $asset->update([
@@ -272,7 +328,7 @@ class AssetController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:TERSEDIA,DIPINJAM,DALAM_PERBAIKAN,RUSAK,DIHAPUSKAN',
+            'status' => 'required|in:TERSEDIA,DIPINJAM,DALAM_PERBAIKAN,RUSAK,DIPINDAHKAN,DIMUSNAHKAN',
         ]);
 
         if ($validator->fails()) {
@@ -289,6 +345,15 @@ class AssetController extends Controller
                 'success' => false,
                 'message' => 'Aset tidak ditemukan'
             ], 404);
+        }
+
+        // Operator unit check
+        $user = auth()->user();
+        if ($user->isOperator() && $user->unit_id && $asset->unit_id !== $user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses ke aset ini'
+            ], 403);
         }
 
         $asset->update([
@@ -317,6 +382,97 @@ class AssetController extends Controller
             'success' => true,
             'message' => 'Status aset berhasil diupdate',
             'data' => $asset
+        ]);
+    }
+
+    /**
+     * Transfer an asset from one unit to another
+     */
+    public function transfer(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'to_unit_id' => 'required|exists:units,id',
+            'to_location_id' => 'required|exists:locations,id',
+            'reason' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $asset = Asset::find($id);
+
+        if (!$asset) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aset tidak ditemukan'
+            ], 404);
+        }
+
+        if ($asset->unit_id == $request->to_unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unit tujuan sama dengan unit asal'
+            ], 400);
+        }
+
+        // Check active loans
+        $hasActiveLoans = $asset->loans()->whereIn('status', ['AKTIF', 'DISETUJUI'])->exists();
+        if ($hasActiveLoans) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat memindahkan aset yang sedang dipinjam'
+            ], 400);
+        }
+
+        $fromUnitId = $asset->unit_id;
+        $fromLocationId = $asset->location_id;
+
+        // Create transfer record
+        AssetTransfer::create([
+            'asset_id' => $asset->id,
+            'from_unit_id' => $fromUnitId,
+            'to_unit_id' => $request->to_unit_id,
+            'from_location_id' => $fromLocationId,
+            'to_location_id' => $request->to_location_id,
+            'reason' => $request->reason,
+            'transferred_by' => auth()->id(),
+            'transferred_at' => now(),
+        ]);
+
+        // Update asset
+        $asset->update([
+            'unit_id' => $request->to_unit_id,
+            'location_id' => $request->to_location_id,
+            'status' => 'DIPINDAHKAN',
+            'updated_by_id' => auth()->id(),
+        ]);
+
+        // Status history
+        StatusHistory::create([
+            'asset_id' => $asset->id,
+            'status' => 'DIPINDAHKAN',
+            'notes' => "Dipindahkan: {$request->reason}",
+            'changed_by' => auth()->id(),
+            'changed_at' => now(),
+        ]);
+
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'TRANSFER_ASSET',
+            'entity' => 'Asset',
+            'entity_id' => $asset->id,
+            'description' => auth()->user()->name . " memindahkan aset {$asset->name} ke unit baru",
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Aset berhasil dipindahkan',
+            'data' => $asset->load(['unit', 'location'])
         ]);
     }
 
@@ -371,11 +527,17 @@ class AssetController extends Controller
             ->orderBy('changed_at', 'desc')
             ->get();
 
+        $transfers = AssetTransfer::with(['fromUnit', 'toUnit', 'fromLocation', 'toLocation', 'transferredByUser'])
+            ->where('asset_id', $id)
+            ->orderBy('transferred_at', 'desc')
+            ->get();
+
         return response()->json([
             'success' => true,
             'data' => [
                 'conditionHistory' => $conditionHistories,
-                'statusHistory' => $statusHistories
+                'statusHistory' => $statusHistories,
+                'transfers' => $transfers,
             ]
         ]);
     }

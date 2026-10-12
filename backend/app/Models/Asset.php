@@ -14,9 +14,8 @@ class Asset extends Model
         'name',
         'category',
         'description',
-        'unit',
-        'location',
-        'floor',
+        'unit_id',
+        'location_id',
         'purchase_year',
         'purchase_price',
         'rental_price_per_day',
@@ -35,6 +34,16 @@ class Asset extends Model
     ];
 
     // Relationships
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(Location::class);
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by_id');
@@ -60,6 +69,11 @@ class Asset extends Model
         return $this->hasMany(StatusHistory::class);
     }
 
+    public function transfers()
+    {
+        return $this->hasMany(AssetTransfer::class);
+    }
+
     // Scopes
     public function scopeAvailable($query)
     {
@@ -69,6 +83,11 @@ class Asset extends Model
     public function scopeBorrowed($query)
     {
         return $query->where('status', 'DIPINJAM');
+    }
+
+    public function scopeByUnit($query, $unitId)
+    {
+        return $query->where('unit_id', $unitId);
     }
 
     public function scopeByCategory($query, $category)

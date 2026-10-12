@@ -1,9 +1,10 @@
 import {
   Search,
   ChevronDown,
+  Menu,
 } from 'lucide-react'
 
-function Header({ user }) {
+function Header({ user, onToggleSidebar }) {
   const getInitials = (name) => {
     if (!name) return 'U'
     return name
@@ -28,6 +29,11 @@ function Header({ user }) {
 
   return (
     <header className="header">
+
+      {/* HAMBURGER BUTTON (mobile only) */}
+      <button className="hamburger-btn" onClick={onToggleSidebar} aria-label="Toggle menu">
+        <Menu size={22} strokeWidth={2} />
+      </button>
       
       {/* SEARCH BOX */}
       <div className="search-box">

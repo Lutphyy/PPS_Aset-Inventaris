@@ -17,7 +17,7 @@ class User extends Authenticatable
         'name',
         'phone',
         'role',
-        'unit',
+        'unit_id',
         'is_active',
         'is_guest',
         'identity_number',
@@ -42,6 +42,11 @@ class User extends Authenticatable
     ];
 
     // Relationships
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
     public function loans()
     {
         return $this->hasMany(Loan::class, 'borrower_id');
@@ -88,6 +93,11 @@ class User extends Authenticatable
         return $query->where('verification_status', 'TERVERIFIKASI');
     }
 
+    public function scopeByUnit($query, $unitId)
+    {
+        return $query->where('unit_id', $unitId);
+    }
+
     // Helper methods
     public function isSuperAdmin()
     {
@@ -99,8 +109,29 @@ class User extends Authenticatable
         return $this->role === 'ADMIN_UNIT';
     }
 
+    public function isOperator()
+    {
+        return $this->role === 'OPERATOR';
+    }
+
     public function isAdmin()
     {
         return in_array($this->role, ['SUPER_ADMIN', 'ADMIN_UNIT']);
+    }
+
+    /**
+     * Check if user can access assets in a specific unit
+     */
+    public function canAccessUnit($unitId)
+    {
+        // SuperAdmin and Admin Unit can access all units
+        if ($this->isAdmin()) {
+            return true;
+        }
+        // Operator can only access their own unit
+        if ($this->isOperator()) {
+            return $this->unit_id == $unitId;
+        }
+        return true; // Borrowers/Guests can view any unit's available assets
     }
 }

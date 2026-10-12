@@ -13,7 +13,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query();
+        $query = User::with('unit');
 
         if ($request->has('role')) {
             $query->where('role', $request->role);
@@ -21,6 +21,10 @@ class UserController extends Controller
 
         if ($request->has('is_guest')) {
             $query->where('is_guest', $request->is_guest);
+        }
+
+        if ($request->has('unit_id')) {
+            $query->where('unit_id', $request->unit_id);
         }
 
         if ($request->has('search')) {
@@ -50,7 +54,7 @@ class UserController extends Controller
 
     public function show($id)
     {
-        $user = User::with(['loans.asset'])->find($id);
+        $user = User::with(['loans.asset', 'unit'])->find($id);
 
         if (!$user) {
             return response()->json([
@@ -76,11 +80,27 @@ class UserController extends Controller
             ], 404);
         }
 
+        // Protect SuperAdmin from being edited
+        if ($user->role === 'SUPER_ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Super Admin tidak dapat diubah'
+            ], 403);
+        }
+
+        // Prevent changing role to SUPER_ADMIN
+        if ($request->has('role') && $request->role === 'SUPER_ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat mengubah role menjadi Super Admin'
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
             'role' => 'nullable|in:SUPER_ADMIN,ADMIN_UNIT,OPERATOR,BORROWER,GUEST,VIEWER',
-            'unit' => 'nullable|string|max:255',
+            'unit_id' => 'nullable|exists:units,id',
         ]);
 
         if ($validator->fails()) {
@@ -90,7 +110,18 @@ class UserController extends Controller
             ], 400);
         }
 
-        $user->update($request->only(['name', 'phone', 'role', 'unit']));
+        $updateData = $request->only(['name', 'phone', 'role', 'unit_id']);
+
+        // If role is changed to non-operator, unit_id can be null
+        // If role is OPERATOR, unit_id should be required
+        if (isset($updateData['role']) && $updateData['role'] === 'OPERATOR' && empty($updateData['unit_id']) && !$user->unit_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Operator harus memiliki unit yang ditentukan'
+            ], 400);
+        }
+
+        $user->update($updateData);
 
         ActivityLog::create([
             'user_id' => auth()->id(),
@@ -104,7 +135,7 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User berhasil diupdate',
-            'data' => $user
+            'data' => $user->load('unit')
         ]);
     }
 
@@ -190,6 +221,14 @@ class UserController extends Controller
                 'success' => false,
                 'message' => 'User tidak ditemukan'
             ], 404);
+        }
+
+        // Protect SuperAdmin from being deleted
+        if ($user->role === 'SUPER_ADMIN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Super Admin tidak dapat dihapus'
+            ], 403);
         }
 
         $hasActiveLoans = $user->loans()->whereIn('status', ['AKTIF', 'DISETUJUI'])->exists();

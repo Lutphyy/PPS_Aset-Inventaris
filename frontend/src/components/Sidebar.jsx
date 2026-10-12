@@ -1,10 +1,10 @@
 import {
   LayoutDashboard, Package, ArrowRightLeft, Undo2, Users,
   FileText, History, Settings, LogOut, Wrench, MapPin,
-  Plus, ClipboardCheck, DollarSign, Eye,
+  Plus, ClipboardCheck, DollarSign, Eye, Building2, SlidersHorizontal,
 } from 'lucide-react'
 
-// Menu config per role — matches the HTML mockup spec
+// Menu config per role
 const ROLE_MENUS = {
   SUPER_ADMIN: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,23 +18,25 @@ const ROLE_MENUS = {
   ],
   ADMIN_UNIT: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'data-aset', label: 'Data Aset Unit', icon: Package },
+    { id: 'data-aset', label: 'Data Aset', icon: Package },
+    { id: 'kelola-unit', label: 'Unit & Lokasi', icon: Building2 },
+    { id: 'kelola-master', label: 'Manajemen Master', icon: SlidersHorizontal },
     { id: 'peminjaman', label: 'Peminjaman', icon: ArrowRightLeft },
     { id: 'pengembalian', label: 'Pengembalian', icon: Undo2 },
     { id: 'monitoring-agreement', label: 'Monitoring Agreement', icon: ClipboardCheck },
     { id: 'pengaturan-biaya', label: 'Pengaturan Biaya', icon: DollarSign },
     { id: 'laporan', label: 'Laporan', icon: FileText },
+    { id: 'audit-log', label: 'Audit Log', icon: History },
   ],
   OPERATOR: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'data-aset', label: 'Data Aset', icon: Package },
+    { id: 'data-aset', label: 'Data Aset Unit', icon: Package },
     { id: 'update-kondisi', label: 'Update Kondisi', icon: Wrench },
     { id: 'update-lokasi', label: 'Update Lokasi', icon: MapPin },
     { id: 'peminjaman', label: 'Peminjaman', icon: ArrowRightLeft },
     { id: 'pengembalian', label: 'Pengembalian', icon: Undo2 },
   ],
   BORROWER: [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'daftar-aset', label: 'Daftar Aset', icon: Package },
     { id: 'ajukan-peminjaman', label: 'Ajukan Peminjaman', icon: Plus },
     { id: 'peminjaman-saya', label: 'Peminjaman Saya', icon: ArrowRightLeft },
@@ -42,14 +44,12 @@ const ROLE_MENUS = {
     { id: 'riwayat', label: 'Riwayat', icon: History },
   ],
   GUEST: [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'daftar-aset', label: 'Daftar Aset', icon: Package },
     { id: 'ajukan-peminjaman', label: 'Ajukan Peminjaman', icon: Plus },
     { id: 'peminjaman-saya', label: 'Peminjaman Saya', icon: ArrowRightLeft },
     { id: 'riwayat', label: 'Riwayat', icon: History },
   ],
   VIEWER: [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'data-aset', label: 'Data Aset', icon: Package },
     { id: 'laporan', label: 'Laporan', icon: FileText },
   ],
@@ -76,13 +76,13 @@ function roleName(role) {
   return map[role] || role
 }
 
-function Sidebar({ activePage, setActivePage, user, onLogout, badgeCounts = {} }) {
+function Sidebar({ activePage, setActivePage, user, onLogout, badgeCounts = {}, isOpen, onClose }) {
   const role = user?.role || 'VIEWER'
   const menuItems = ROLE_MENUS[role] || ROLE_MENUS.VIEWER
   const rc = ROLE_COLORS[role] || ROLE_COLORS.VIEWER
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       {/* LOGO */}
       <div className="logo">
         <div className="logo-icon">
@@ -133,6 +133,11 @@ function Sidebar({ activePage, setActivePage, user, onLogout, badgeCounts = {} }
             {roleName(role)}
           </div>
         </div>
+        {user?.unit && (
+          <div style={{ fontSize: '10px', color: '#527bd8', fontWeight: 600, marginBottom: '4px' }}>
+            Unit: {user.unit.name}
+          </div>
+        )}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#292936', marginBottom: '2px' }}>
             {user?.name || 'User'}

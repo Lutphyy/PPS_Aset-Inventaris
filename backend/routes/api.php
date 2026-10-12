@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\AgreementController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\UnitController;
+use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\MasterDataController;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,18 +39,52 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard routes
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
+    // Master data: read for all authenticated users (needed for dropdowns)
+    Route::get('/master-data', [MasterDataController::class, 'index']);
+
+    // Master data management (Admin Unit only)
+    Route::middleware('role:ADMIN_UNIT')->group(function () {
+        Route::put('/master-data/categories', [MasterDataController::class, 'updateCategories']);
+        Route::put('/master-data/conditions', [MasterDataController::class, 'updateConditions']);
+        Route::put('/master-data/statuses', [MasterDataController::class, 'updateStatuses']);
+    });
+
+    // Unit & Location management routes (Admin Unit only)
+    Route::middleware('role:ADMIN_UNIT')->group(function () {
+        Route::prefix('units')->group(function () {
+            Route::get('/', [UnitController::class, 'index']);
+            Route::get('/{id}', [UnitController::class, 'show']);
+            Route::post('/', [UnitController::class, 'store']);
+            Route::put('/{id}', [UnitController::class, 'update']);
+            Route::delete('/{id}', [UnitController::class, 'destroy']);
+        });
+
+        Route::prefix('locations')->group(function () {
+            Route::get('/', [LocationController::class, 'index']);
+            Route::get('/{id}', [LocationController::class, 'show']);
+            Route::post('/', [LocationController::class, 'store']);
+            Route::put('/{id}', [LocationController::class, 'update']);
+            Route::delete('/{id}', [LocationController::class, 'destroy']);
+        });
+    });
+
+    // Public unit/location listing (all authenticated users can list for dropdowns)
+    Route::get('/units-list', [UnitController::class, 'index']);
+    Route::get('/locations-list', [LocationController::class, 'index']);
+
     // Asset routes
     Route::prefix('assets')->group(function () {
         Route::get('/', [AssetController::class, 'index']);
         Route::get('/{id}', [AssetController::class, 'show']);
         Route::get('/{id}/history', [AssetController::class, 'history']);
         
-        // Admin only routes
+        // Admin/Operator only routes
         Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT,OPERATOR')->group(function () {
             Route::post('/', [AssetController::class, 'store']);
             Route::put('/{id}', [AssetController::class, 'update']);
             Route::patch('/{id}/condition', [AssetController::class, 'updateCondition']);
             Route::patch('/{id}/status', [AssetController::class, 'updateStatus']);
+            Route::post('/{id}/transfer', [AssetController::class, 'transfer']);
             Route::delete('/{id}', [AssetController::class, 'destroy']);
         });
     });
@@ -59,7 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [LoanController::class, 'show']);
         Route::post('/', [LoanController::class, 'store']);
         
-        // Admin only routes
+        // Admin/Operator only routes
         Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT,OPERATOR')->group(function () {
             Route::patch('/{id}/approve', [LoanController::class, 'approve']);
             Route::patch('/{id}/reject', [LoanController::class, 'reject']);
@@ -67,8 +104,8 @@ Route::middleware('auth:sanctum')->group(function () {
         });
     });
 
-    // User management routes (Admin only)
-    Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT')->group(function () {
+    // User management routes (Super Admin only)
+    Route::middleware('role:SUPER_ADMIN')->group(function () {
         Route::prefix('users')->group(function () {
             Route::get('/', [UserController::class, 'index']);
             Route::get('/{id}', [UserController::class, 'show']);
@@ -97,13 +134,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}', [PaymentController::class, 'update']);
     });
 
-    // Report routes (Admin only)
+    // Report routes (Admin/Operator/Viewer)
     Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT,OPERATOR,VIEWER')->group(function () {
         Route::prefix('reports')->group(function () {
-            Route::get('/assets/excel', [ReportController::class, 'exportAssetsToExcel']);
-            Route::get('/assets/by-condition/excel', [ReportController::class, 'exportAssetsByCondition']);
-            Route::get('/revenue/excel', [ReportController::class, 'exportRevenue']);
-            Route::get('/loans/excel', [ReportController::class, 'exportLoans']);
+            Route::get('/assets/excel', [ReportController::class, 'exportAssetsExcel']);
+            Route::get('/assets/by-condition/excel', [ReportController::class, 'exportAssetsByConditionExcel']);
+            Route::get('/revenue/excel', [ReportController::class, 'exportRevenueExcel']);
+            Route::get('/loans/excel', [ReportController::class, 'exportLoansExcel']);
         });
     });
 
