@@ -45,13 +45,13 @@ function UpdateLokasi() {
       <div className="asset-table-card">
         <div className="asset-table-wrapper">
           <table className="asset-table">
-            <thead><tr><th>Kode</th><th>Nama Aset</th><th>Unit</th><th>Lokasi Saat Ini</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>Kode Barang</th><th>Nama Barang</th><th>Unit</th><th>Lokasi Saat Ini</th><th>Aksi</th></tr></thead>
             <tbody>
               {loading ? <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr> :
                assets.map(a => (
                 <tr key={a.id}>
-                  <td style={{ fontWeight: 600 }}>{a.code}</td>
-                  <td>{a.name}</td>
+                  <td style={{ fontWeight: 600 }}>{a.kode_barang || '-'}</td>
+                  <td>{a.nama_barang}</td>
                   <td><span style={{ fontSize: '11px', fontWeight: 600, color: '#527bd8' }}>{a.unit?.name || '-'}</span></td>
                   <td style={{ fontSize: '12px', color: '#666' }}>{a.location?.name || '-'}</td>
                   <td>

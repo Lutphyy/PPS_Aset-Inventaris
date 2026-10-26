@@ -107,6 +107,14 @@ class LoanController extends Controller
             ], 400);
         }
 
+        // Check if asset is borrowable
+        if (!$asset->is_borrowable) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aset ini tidak diizinkan untuk dipinjam'
+            ], 400);
+        }
+
         $borrower = auth()->user();
 
         // Calculate costs
@@ -116,7 +124,8 @@ class LoanController extends Controller
 
         $discountPercent = $borrower->is_guest ? 0 : (SystemSetting::get('CAMPUS_DISCOUNT_PERCENT', 50));
         
-        $totalRentalCost = $asset->rental_price_per_day * $totalDays;
+        $rentalPricePerDay = $asset->rental_price ?? 0;
+        $totalRentalCost = $rentalPricePerDay * $totalDays;
         $discountAmount = ($totalRentalCost * $discountPercent) / 100;
         $totalCost = $totalRentalCost - $discountAmount;
         $depositAmount = $borrower->is_guest ? ($totalCost * 0.5) : 0;
@@ -129,8 +138,8 @@ class LoanController extends Controller
             'borrow_date' => $borrowDate,
             'estimated_return_date' => $returnDate,
             'status' => 'MENUNGGU',
-            'condition_when_borrowed' => $asset->condition,
-            'rental_cost_per_day' => $asset->rental_price_per_day,
+            'condition_when_borrowed' => $asset->kondisi,
+            'rental_cost_per_day' => $rentalPricePerDay,
             'total_days' => $totalDays,
             'total_rental_cost' => $totalRentalCost,
             'discount_percent' => $discountPercent,
@@ -162,7 +171,7 @@ class LoanController extends Controller
             'action' => 'CREATE_LOAN',
             'entity' => 'Loan',
             'entity_id' => $loan->id,
-            'description' => "{$borrower->name} mengajukan peminjaman {$asset->name} (Unit: {$asset->unit->name})",
+            'description' => "{$borrower->name} mengajukan peminjaman {$asset->nama_barang} (Unit: {$asset->unit->name})",
             'ip_address' => $request->ip(),
         ]);
 
@@ -400,9 +409,9 @@ Email: {$borrower->email}
 " . ($borrower->is_guest ? "No. KTP: {$borrower->identity_number}" : "Unit: {$unitName}") . "
 
 ASET YANG DIPINJAM:
-- Kode: {$asset->code}
-- Nama: {$asset->name}
-- Kategori: {$asset->category}
+- Kode Barang: {$asset->kode_barang}
+- Nama Barang: {$asset->nama_barang}
+- Jenis BMN: {$asset->jenis_bmn}
 - Unit: {$unitName}
 - Lokasi: {$locationName}
 

@@ -24,8 +24,10 @@ import UpdateLokasi from './pages/UpdateLokasi'
 import Login from './pages/Login'
 import KelolaUnit from './pages/KelolaUnit'
 import KelolaMaster from './pages/KelolaMaster'
+import Gudang from './pages/Gudang'
+import PersetujuanAset from './pages/PersetujuanAset'
 
-import { dashboardAPI } from './utils/api'
+import { dashboardAPI, assetRequestsAPI } from './utils/api'
 
 function App() {
   const getDefaultPage = (role) => {
@@ -64,6 +66,14 @@ function App() {
       // Map dashboard stats to menu item IDs
       if (data.pendingLoans > 0) counts['peminjaman'] = data.pendingLoans
       if (data.pendingGuestVerifications > 0) counts['user-role'] = data.pendingGuestVerifications
+
+      // Fetch pending asset request count (for admin)
+      if (['ADMIN_UNIT'].includes(user.role)) {
+        try {
+          const reqRes = await assetRequestsAPI.getPendingCount()
+          if (reqRes.count > 0) counts['persetujuan-aset'] = reqRes.count
+        } catch (e) { /* ignore */ }
+      }
 
       setBadgeCounts(counts)
     } catch (err) {
@@ -149,6 +159,11 @@ function App() {
         return <KelolaUnit />
       case 'kelola-master':
         return <KelolaMaster />
+      case 'gudang':
+        return <Gudang />
+      case 'persetujuan-aset':
+      case 'permintaan-aset':
+        return <PersetujuanAset />
       default:
         return <Dashboard />
     }

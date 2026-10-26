@@ -3,7 +3,18 @@ import { Search, Building2 } from 'lucide-react'
 import { assetsAPI, unitsAPI } from '../utils/api'
 
 const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
-const condLabel = (c) => c?.replace(/_/g, ' ') || c
+const rentalLabel = (unit) => {
+  const map = { per_jam: '/jam', per_hari: '/hari', per_minggu: '/minggu', per_bulan: '/bulan' }
+  return map[unit] || '/hari'
+}
+const kondisiColor = (k) => {
+  if (!k) return { bg: '#f0f0f0', color: '#666' }
+  const kl = k.toLowerCase()
+  if (kl.includes('baik')) return { bg: '#e4f6f0', color: '#299579' }
+  if (kl.includes('ringan')) return { bg: '#fff4e5', color: '#d4850d' }
+  if (kl.includes('berat')) return { bg: '#fde8e8', color: '#d14343' }
+  return { bg: '#f0f0f0', color: '#666' }
+}
 
 function DaftarAset({ onNavigate }) {
   const [assets, setAssets] = useState([])
@@ -31,7 +42,8 @@ function DaftarAset({ onNavigate }) {
   const fetchAssets = async () => {
     try {
       setLoading(true)
-      const res = await assetsAPI.getAll({ search, status: 'TERSEDIA', unit_id: selectedUnitId, limit: 100 })
+      // Borrowers only see borrowable + available assets (handled by backend)
+      const res = await assetsAPI.getAll({ search, unit_id: selectedUnitId, limit: 100 })
       setAssets(res.data || [])
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
@@ -48,24 +60,24 @@ function DaftarAset({ onNavigate }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '14px' }}>
           {loading ? <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: '2rem' }}>Memuat unit...</p> :
             units.length === 0 ? <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: '2rem' }}>Tidak ada unit tersedia</p> :
-            units.map(unit => (
-              <div key={unit.id} onClick={() => setSelectedUnitId(unit.id)}
-                style={{
-                  background: '#fff', border: '1px solid #eee', borderRadius: '14px', padding: '24px',
-                  cursor: 'pointer', transition: '0.2s', display: 'flex', flexDirection: 'column', gap: '8px',
-                }}
-                onMouseOver={e => { e.currentTarget.style.borderColor = '#527bd8'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(82,123,216,0.12)' }}
-                onMouseOut={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = 'none' }}
-              >
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Building2 size={20} color="#527bd8" />
+              units.map(unit => (
+                <div key={unit.id} onClick={() => setSelectedUnitId(unit.id)}
+                  style={{
+                    background: '#fff', border: '1px solid #eee', borderRadius: '14px', padding: '24px',
+                    cursor: 'pointer', transition: '0.2s', display: 'flex', flexDirection: 'column', gap: '8px',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.borderColor = '#527bd8'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(82,123,216,0.12)' }}
+                  onMouseOut={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = 'none' }}
+                >
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building2 size={20} color="#527bd8" />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: '15px' }}>{unit.name}</h3>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#527bd8', background: '#e9f0ff', padding: '2px 8px', borderRadius: '6px', width: 'fit-content' }}>{unit.code}</span>
+                  {unit.description && <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>{unit.description}</p>}
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{unit.assets_count || 0} aset tersedia</div>
                 </div>
-                <h3 style={{ margin: 0, fontSize: '15px' }}>{unit.name}</h3>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#527bd8', background: '#e9f0ff', padding: '2px 8px', borderRadius: '6px', width: 'fit-content' }}>{unit.code}</span>
-                {unit.description && <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>{unit.description}</p>}
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{unit.assets_count || 0} aset tersedia</div>
-              </div>
-            ))
+              ))
           }
         </div>
       </div>
@@ -99,22 +111,28 @@ function DaftarAset({ onNavigate }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
         {loading ? <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: '2rem' }}>Memuat...</p> :
           assets.length === 0 ? <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#999', padding: '2rem' }}>Tidak ada aset tersedia di unit ini</p> :
-          assets.map(a => (
-            <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '11px', color: '#888', fontWeight: 600 }}>{a.code}</div>
-              <h3 style={{ margin: 0, fontSize: '14px' }}>{a.name}</h3>
-              <div style={{ fontSize: '12px', color: '#666' }}>{a.category} · {a.location?.name || '-'}</div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: '#e4f6f0', color: '#299579' }}>Tersedia</span>
-                <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: '#e9f0ff', color: '#527bd8' }}>{condLabel(a.condition)}</span>
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#149E93', marginTop: '4px' }}>{fmtIDR(a.rental_price_per_day)}<span style={{ fontSize: '11px', fontWeight: 400, color: '#888' }}>/hari</span></div>
-              <button className="add-asset-button" style={{ marginTop: '8px', width: '100%', justifyContent: 'center' }}
-                onClick={() => onNavigate && onNavigate('ajukan-peminjaman', a.id)}>
-                Ajukan Peminjaman
-              </button>
-            </div>
-          ))
+            assets.map(a => {
+              const kc = kondisiColor(a.kondisi)
+              return (
+                <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', fontWeight: 600 }}>{a.kode_barang || '-'}</div>
+                  <h3 style={{ margin: 0, fontSize: '14px' }}>{a.nama_barang}</h3>
+                  <div style={{ fontSize: '12px', color: '#666' }}>{a.jenis_bmn || '-'} · {a.location?.name || '-'}</div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: '#e4f6f0', color: '#299579' }}>Tersedia</span>
+                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: kc.bg, color: kc.color }}>{a.kondisi}</span>
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#149E93', marginTop: '4px' }}>
+                    {a.rental_price ? fmtIDR(a.rental_price) : fmtIDR(0)}
+                    <span style={{ fontSize: '11px', fontWeight: 400, color: '#888' }}>{rentalLabel(a.rental_unit)}</span>
+                  </div>
+                  <button className="add-asset-button" style={{ marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                    onClick={() => onNavigate && onNavigate('ajukan-peminjaman', a.id)}>
+                    Ajukan Peminjaman
+                  </button>
+                </div>
+              )
+            })
         }
       </div>
     </div>

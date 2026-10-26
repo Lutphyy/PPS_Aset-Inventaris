@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Package, ArrowRightLeft, Undo2, Users,
   FileText, History, Settings, LogOut, Wrench, MapPin,
   Plus, ClipboardCheck, DollarSign, Eye, Building2, SlidersHorizontal,
+  Warehouse,
 } from 'lucide-react'
 
 // Menu config per role
@@ -19,6 +20,8 @@ const ROLE_MENUS = {
   ADMIN_UNIT: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'data-aset', label: 'Data Aset', icon: Package },
+    { id: 'gudang', label: 'Gudang Aset', icon: Warehouse },
+    { id: 'persetujuan-aset', label: 'Persetujuan Aset', icon: ClipboardCheck },
     { id: 'kelola-unit', label: 'Unit & Lokasi', icon: Building2 },
     { id: 'kelola-master', label: 'Manajemen Master', icon: SlidersHorizontal },
     { id: 'peminjaman', label: 'Peminjaman', icon: ArrowRightLeft },
@@ -27,14 +30,18 @@ const ROLE_MENUS = {
     { id: 'pengaturan-biaya', label: 'Pengaturan Biaya', icon: DollarSign },
     { id: 'laporan', label: 'Laporan', icon: FileText },
     { id: 'audit-log', label: 'Audit Log', icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ],
   OPERATOR: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'data-aset', label: 'Data Aset Unit', icon: Package },
+    { id: 'gudang', label: 'Gudang Aset', icon: Warehouse },
+    { id: 'permintaan-aset', label: 'Permintaan Saya', icon: ClipboardCheck },
     { id: 'update-kondisi', label: 'Update Kondisi', icon: Wrench },
     { id: 'update-lokasi', label: 'Update Lokasi', icon: MapPin },
     { id: 'peminjaman', label: 'Peminjaman', icon: ArrowRightLeft },
     { id: 'pengembalian', label: 'Pengembalian', icon: Undo2 },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ],
   BORROWER: [
     { id: 'daftar-aset', label: 'Daftar Aset', icon: Package },
@@ -42,16 +49,19 @@ const ROLE_MENUS = {
     { id: 'peminjaman-saya', label: 'Peminjaman Saya', icon: ArrowRightLeft },
     { id: 'pengembalian', label: 'Pengembalian', icon: Undo2 },
     { id: 'riwayat', label: 'Riwayat', icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ],
   GUEST: [
     { id: 'daftar-aset', label: 'Daftar Aset', icon: Package },
     { id: 'ajukan-peminjaman', label: 'Ajukan Peminjaman', icon: Plus },
     { id: 'peminjaman-saya', label: 'Peminjaman Saya', icon: ArrowRightLeft },
     { id: 'riwayat', label: 'Riwayat', icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ],
   VIEWER: [
     { id: 'data-aset', label: 'Data Aset', icon: Package },
     { id: 'laporan', label: 'Laporan', icon: FileText },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ],
 }
 

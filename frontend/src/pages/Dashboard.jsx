@@ -34,7 +34,7 @@ function Dashboard() {
   const ov = stats?.overview || {}
   const byStatus = stats?.assetsByStatus || {}
   const byCond = stats?.assetsByCondition || {}
-  const byCat = stats?.assetsByCategory || []
+  const byJenis = stats?.assetsByJenisBmn || []
   const byUnit = stats?.assetsByUnit || []
   const recent = stats?.recentLoans || []
   const upcoming = stats?.upcomingDue || []
@@ -104,7 +104,7 @@ function Dashboard() {
                   <p>Distribusi aset berdasarkan kategori</p>
                 </div>
               </div>
-              <DonutChart data={byCat.map(c => ({ name: c.category, value: c.count }))} />
+              <DonutChart data={byJenis.map(c => ({ name: c.jenis_bmn, value: c.count }))} />
             </div>
 
             <div className="chart-card">

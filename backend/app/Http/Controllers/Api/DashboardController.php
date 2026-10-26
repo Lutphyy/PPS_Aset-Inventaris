@@ -37,18 +37,19 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status');
 
-        // Assets by condition
-        $assetsByCondition = (clone $assetQuery)->selectRaw('`condition`, COUNT(*) as count')
-            ->groupBy('condition')
-            ->pluck('count', 'condition');
+        // Assets by condition (now uses 'kondisi' column)
+        $assetsByCondition = (clone $assetQuery)->selectRaw('kondisi, COUNT(*) as count')
+            ->groupBy('kondisi')
+            ->pluck('count', 'kondisi');
 
-        // Assets by category
-        $assetsByCategory = (clone $assetQuery)->selectRaw('category, COUNT(*) as count')
-            ->groupBy('category')
+        // Assets by jenis BMN (replaces old 'category')
+        $assetsByJenisBmn = (clone $assetQuery)->selectRaw('jenis_bmn, COUNT(*) as count')
+            ->whereNotNull('jenis_bmn')
+            ->groupBy('jenis_bmn')
             ->get()
             ->map(function ($item) {
                 return [
-                    'category' => $item->category,
+                    'jenis_bmn' => $item->jenis_bmn,
                     'count' => $item->count
                 ];
             });
@@ -118,12 +119,13 @@ class DashboardController extends Controller
                     'activeLoans' => $activeLoans,
                     'pendingLoans' => $pendingLoans,
                     'pendingGuestVerifications' => $pendingGuestVerifications,
+                    'gudangAssets' => Asset::where('status', 'GUDANG')->count(),
                     'revenueThisMonth' => $revenueThisMonth ?? 0,
                     'revenueTotal' => $revenueTotal ?? 0,
                 ],
                 'assetsByStatus' => $assetsByStatus,
                 'assetsByCondition' => $assetsByCondition,
-                'assetsByCategory' => $assetsByCategory,
+                'assetsByJenisBmn' => $assetsByJenisBmn,
                 'assetsByUnit' => $assetsByUnit,
                 'recentLoans' => $recentLoans,
                 'upcomingDue' => $upcomingDue,

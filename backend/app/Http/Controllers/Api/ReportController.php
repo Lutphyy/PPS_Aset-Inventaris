@@ -27,18 +27,6 @@ class ReportController extends Controller
         return $query;
     }
 
-    public function conditionLabel($condition)
-    {
-        $labels = [
-            'BAIK' => 'Baik',
-            'CUKUP' => 'Cukup',
-            'KURANG' => 'Kurang',
-            'RUSAK_RINGAN' => 'Rusak Ringan',
-            'RUSAK_BERAT' => 'Rusak Berat',
-        ];
-        return $labels[$condition] ?? $condition;
-    }
-
     public function exportAssetsExcel(Request $request)
     {
         $query = $this->getAssetQuery();
@@ -47,22 +35,33 @@ class ReportController extends Controller
             $query->where('unit_id', $request->unit_id);
         }
 
-        $assets = $query->orderBy('code')->get();
+        $assets = $query->orderBy('kode_barang')->get();
         
-        $headings = ['Kode', 'Nama Aset', 'Kategori', 'Unit', 'Lokasi', 'Tahun Perolehan', 'Harga Beli', 'Biaya Sewa/Hari', 'Kondisi', 'Status', 'Dibuat Oleh', 'Tanggal Dibuat'];
+        $headings = ['Kode Barang', 'NUP', 'Kode Register', 'Nama Barang', 'Jenis BMN', 'Merk', 'Tipe',
+                     'Kondisi', 'Unit', 'Lokasi', 'Status', 'Tgl Perolehan', 'Nilai Perolehan',
+                     'Nilai Buku', 'Intra/Ekstra', 'Bisa Dipinjam', 'Harga Sewa', 'Satuan Sewa',
+                     'Dibuat Oleh', 'Tanggal Dibuat'];
         
         $data = $assets->map(function($asset) {
             return [
-                'Kode' => $asset->code,
-                'Nama Aset' => $asset->name,
-                'Kategori' => $asset->category,
-                'Unit' => $asset->unit->name ?? '-',
+                'Kode Barang' => $asset->kode_barang,
+                'NUP' => $asset->nup,
+                'Kode Register' => $asset->kode_register,
+                'Nama Barang' => $asset->nama_barang,
+                'Jenis BMN' => $asset->jenis_bmn,
+                'Merk' => $asset->merk,
+                'Tipe' => $asset->tipe,
+                'Kondisi' => $asset->kondisi,
+                'Unit' => $asset->unit->name ?? 'Gudang',
                 'Lokasi' => $asset->location->name ?? '-',
-                'Tahun Perolehan' => $asset->purchase_year ?? '-',
-                'Harga Beli' => $asset->purchase_price ?? 0,
-                'Biaya Sewa/Hari' => $asset->rental_price_per_day,
-                'Kondisi' => $asset->condition,
                 'Status' => $asset->status,
+                'Tgl Perolehan' => $asset->tanggal_perolehan ?? '-',
+                'Nilai Perolehan' => $asset->nilai_perolehan ?? 0,
+                'Nilai Buku' => $asset->nilai_buku ?? 0,
+                'Intra/Ekstra' => $asset->intra_ekstra ?? '-',
+                'Bisa Dipinjam' => $asset->is_borrowable ? 'Ya' : 'Tidak',
+                'Harga Sewa' => $asset->rental_price ?? 0,
+                'Satuan Sewa' => $asset->rental_unit ?? '-',
                 'Dibuat Oleh' => $asset->createdBy->name ?? '-',
                 'Tanggal Dibuat' => $asset->created_at->format('d-m-Y'),
             ];
@@ -84,37 +83,34 @@ class ReportController extends Controller
             public function headings(): array {
                 return $this->headings;
             }
-        }, 'Laporan_Aset.xlsx');
+        }, 'Laporan_Aset_BMN.xlsx');
     }
 
     public function exportAssetsByConditionExcel(Request $request)
     {
-        $conditions = ['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT'];
+        $conditions = ['Baik', 'Rusak Ringan', 'Rusak Berat'];
         $user = auth()->user();
         $unitId = $request->get('unit_id');
         $isOperator = $user->isOperator() && $user->unit_id;
-        $controller = $this;
         
-        return Excel::download(new class($conditions, $isOperator, $user, $unitId, $controller) implements WithMultipleSheets {
+        return Excel::download(new class($conditions, $isOperator, $user, $unitId) implements WithMultipleSheets {
             private $conditions;
             private $isOperator;
             private $user;
             private $unitId;
-            private $controller;
             
-            public function __construct($conditions, $isOperator, $user, $unitId, $controller) {
+            public function __construct($conditions, $isOperator, $user, $unitId) {
                 $this->conditions = $conditions;
                 $this->isOperator = $isOperator;
                 $this->user = $user;
                 $this->unitId = $unitId;
-                $this->controller = $controller;
             }
             
             public function sheets(): array {
                 $sheets = [];
                 
                 foreach ($this->conditions as $condition) {
-                    $query = Asset::with(['unit', 'location'])->where('condition', $condition);
+                    $query = Asset::with(['unit', 'location'])->where('kondisi', $condition);
                     
                     if ($this->isOperator) {
                         $query->where('unit_id', $this->user->unit_id);
@@ -122,23 +118,24 @@ class ReportController extends Controller
                         $query->where('unit_id', $this->unitId);
                     }
                     
-                    $assets = $query->orderBy('code')->get();
+                    $assets = $query->orderBy('kode_barang')->get();
                     
                     $data = $assets->map(function($asset) {
                         return [
-                            'Kode' => $asset->code,
-                            'Nama Aset' => $asset->name,
-                            'Kategori' => $asset->category,
-                            'Unit' => $asset->unit->name ?? '-',
+                            'Kode Barang' => $asset->kode_barang,
+                            'NUP' => $asset->nup,
+                            'Nama Barang' => $asset->nama_barang,
+                            'Jenis BMN' => $asset->jenis_bmn,
+                            'Merk' => $asset->merk,
+                            'Unit' => $asset->unit->name ?? 'Gudang',
                             'Lokasi' => $asset->location->name ?? '-',
                             'Status' => $asset->status,
-                            'Biaya Sewa/Hari' => $asset->rental_price_per_day,
+                            'Nilai Perolehan' => $asset->nilai_perolehan ?? 0,
                         ];
                     });
                     
-                    // Use readable condition name for sheet title
-                    $sheetTitle = $this->controller->conditionLabel($condition);
-                    $sheetHeadings = ['Kode', 'Nama Aset', 'Kategori', 'Unit', 'Lokasi', 'Status', 'Biaya Sewa/Hari'];
+                    $sheetTitle = $condition;
+                    $sheetHeadings = ['Kode Barang', 'NUP', 'Nama Barang', 'Jenis BMN', 'Merk', 'Unit', 'Lokasi', 'Status', 'Nilai Perolehan'];
                     
                     $sheets[] = new class($data, $sheetTitle, $sheetHeadings) implements FromCollection, WithHeadings, WithTitle {
                         private $data;
@@ -177,16 +174,16 @@ class ReportController extends Controller
             ->orderBy('paid_at', 'desc')
             ->get();
         
-        $headings = ['Tanggal Bayar', 'Peminjam', 'Tipe', 'Unit Aset', 'Aset', 'Kode Aset', 'Total Hari', 'Biaya Sewa', 'Diskon (%)', 'Diskon (Rp)', 'Denda Terlambat', 'Total Bayar', 'Metode'];
+        $headings = ['Tanggal Bayar', 'Peminjam', 'Tipe', 'Unit Aset', 'Aset', 'Kode Barang', 'Total Hari', 'Biaya Sewa', 'Diskon (%)', 'Diskon (Rp)', 'Denda Terlambat', 'Total Bayar', 'Metode'];
         
         $data = $payments->map(function($payment) {
             return [
                 'Tanggal Bayar' => $payment->paid_at ? $payment->paid_at->format('d-m-Y') : '-',
                 'Peminjam' => $payment->loan->borrower->name,
                 'Tipe' => $payment->loan->borrower->is_guest ? 'Tamu' : 'Kampus',
-                'Unit Aset' => $payment->loan->asset->unit->name ?? '-',
-                'Aset' => $payment->loan->asset->name,
-                'Kode Aset' => $payment->loan->asset->code,
+                'Unit Aset' => $payment->loan->asset->unit->name ?? 'Gudang',
+                'Aset' => $payment->loan->asset->nama_barang,
+                'Kode Barang' => $payment->loan->asset->kode_barang,
                 'Total Hari' => $payment->loan->total_days,
                 'Biaya Sewa' => $payment->loan->total_rental_cost,
                 'Diskon (%)' => $payment->loan->discount_percent,
@@ -233,7 +230,7 @@ class ReportController extends Controller
 
         $loans = $query->get();
         
-        $headings = ['ID Peminjaman', 'Tanggal Pinjam', 'Est. Kembali', 'Kembali Aktual', 'Peminjam', 'Email', 'Tipe', 'Aset', 'Kode Aset', 'Unit', 'Kategori', 'Status', 'Kondisi Pinjam', 'Kondisi Kembali', 'Total Biaya', 'Denda'];
+        $headings = ['ID Peminjaman', 'Tanggal Pinjam', 'Est. Kembali', 'Kembali Aktual', 'Peminjam', 'Email', 'Tipe', 'Aset', 'Kode Barang', 'Unit', 'Jenis BMN', 'Status', 'Kondisi Pinjam', 'Kondisi Kembali', 'Total Biaya', 'Denda'];
         
         $data = $loans->map(function($loan) {
             return [
@@ -244,10 +241,10 @@ class ReportController extends Controller
                 'Peminjam' => $loan->borrower->name,
                 'Email' => $loan->borrower->email,
                 'Tipe' => $loan->borrower->is_guest ? 'Tamu' : 'Kampus',
-                'Aset' => $loan->asset->name,
-                'Kode Aset' => $loan->asset->code,
-                'Unit' => $loan->asset->unit->name ?? '-',
-                'Kategori' => $loan->asset->category,
+                'Aset' => $loan->asset->nama_barang,
+                'Kode Barang' => $loan->asset->kode_barang,
+                'Unit' => $loan->asset->unit->name ?? 'Gudang',
+                'Jenis BMN' => $loan->asset->jenis_bmn,
                 'Status' => $loan->status,
                 'Kondisi Pinjam' => $loan->condition_when_borrowed,
                 'Kondisi Kembali' => $loan->condition_when_returned ?? '-',

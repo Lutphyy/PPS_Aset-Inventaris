@@ -136,7 +136,7 @@ export const locationsAPI = {
     apiFetch(`/locations/${id}`, { method: 'DELETE' }),
 }
 
-// Assets API
+// Assets API (Revised for BMN + Gudang)
 export const assetsAPI = {
   getAll: (params = {}) => apiFetch(`/assets${buildQuery(params)}`),
 
@@ -158,10 +158,10 @@ export const assetsAPI = {
     return apiFetch(`/assets/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   },
 
-  updateCondition: (id, condition, notes) =>
+  updateCondition: (id, kondisi, notes) =>
     apiFetch(`/assets/${id}/condition`, {
       method: 'PATCH',
-      body: JSON.stringify({ condition, notes })
+      body: JSON.stringify({ kondisi, notes })
     }),
 
   updateStatus: (id, status, notes) =>
@@ -177,7 +177,70 @@ export const assetsAPI = {
     }),
 
   delete: (id) =>
-    apiFetch(`/assets/${id}`, { method: 'DELETE' })
+    apiFetch(`/assets/${id}`, { method: 'DELETE' }),
+
+  // ===== NEW: Import Excel =====
+  importExcel: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiFetch('/assets/import', { method: 'POST', body: formData })
+  },
+
+  // ===== NEW: Gudang =====
+  getGudang: (params = {}) => apiFetch(`/gudang${buildQuery(params)}`),
+
+  // ===== NEW: Klaim aset dari gudang =====
+  claim: (id) =>
+    apiFetch(`/assets/${id}/claim`, { method: 'POST' }),
+
+  // ===== NEW: Admin assign ke unit =====
+  assignToUnit: (id, data) =>
+    apiFetch(`/assets/${id}/assign-unit`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  // ===== NEW: Toggle borrowable =====
+  toggleBorrowable: (id) =>
+    apiFetch(`/assets/${id}/toggle-borrowable`, { method: 'PATCH' }),
+
+  // ===== NEW: Set rental price =====
+  setRentalPrice: (id, rental_price, rental_unit) =>
+    apiFetch(`/assets/${id}/rental-price`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rental_price, rental_unit })
+    }),
+}
+
+// Asset Requests API (Approval workflow)
+export const assetRequestsAPI = {
+  getAll: (params = {}) => apiFetch(`/asset-requests${buildQuery(params)}`),
+
+  getPendingCount: () => apiFetch('/asset-requests/pending-count'),
+
+  requestClaim: (assetId, reason) =>
+    apiFetch(`/asset-requests/claim/${assetId}`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    }),
+
+  requestTransfer: (assetId, data) =>
+    apiFetch(`/asset-requests/transfer/${assetId}`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  approve: (id, notes) =>
+    apiFetch(`/asset-requests/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes })
+    }),
+
+  reject: (id, notes) =>
+    apiFetch(`/asset-requests/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes })
+    }),
 }
 
 // Loans API
@@ -313,7 +376,7 @@ export const activityLogsAPI = {
 }
 
 export default {
-  authAPI, assetsAPI, loansAPI, usersAPI, dashboardAPI, masterDataAPI,
+  authAPI, assetsAPI, assetRequestsAPI, loansAPI, usersAPI, dashboardAPI, masterDataAPI,
   agreementsAPI, paymentsAPI, reportsAPI, activityLogsAPI,
   unitsAPI, locationsAPI,
 }

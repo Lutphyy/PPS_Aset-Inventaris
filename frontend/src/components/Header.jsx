@@ -34,39 +34,11 @@ function Header({ user, onToggleSidebar }) {
       <button className="hamburger-btn" onClick={onToggleSidebar} aria-label="Toggle menu">
         <Menu size={22} strokeWidth={2} />
       </button>
-      
-      {/* SEARCH BOX */}
-      <div className="search-box">
-        <Search size={16} strokeWidth={1.8} />
 
-        <input
-          type="text"
-          placeholder="Cari aset, peminjaman, atau user..."
-        />
-      </div>
 
-      {/* RIGHT SECTION */}
-      <div className="header-right">
 
-        {/* USER PROFILE */}
-        <div className="profile">
-          <div className="profile-avatar">
-            {getInitials(user?.name)}
-          </div>
 
-          <div className="profile-info">
-            <strong>{user?.name || 'User'}</strong>
-            <span>{getRoleName(user?.role)}</span>
-          </div>
 
-          <ChevronDown
-            className="arrow"
-            size={14}
-            strokeWidth={2}
-          />
-        </div>
-
-      </div>
 
     </header>
   )

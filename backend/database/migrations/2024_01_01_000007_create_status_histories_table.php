@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('status_histories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('asset_id')->constrained('assets')->onDelete('cascade');
-            $table->enum('status', ['TERSEDIA', 'DIPINJAM', 'DALAM_PERBAIKAN', 'RUSAK', 'DIHAPUSKAN']);
+            $table->string('status');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('changed_by');
             $table->timestamp('changed_at')->useCurrent();

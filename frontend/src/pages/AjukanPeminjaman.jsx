@@ -62,7 +62,7 @@ function AjukanPeminjaman({ selectedAssetId }) {
   const days = form.borrow_date && form.estimated_return_date
     ? Math.max(1, Math.ceil((new Date(form.estimated_return_date) - new Date(form.borrow_date)) / 86400000))
     : 0
-  const rentalTotal = (selectedAsset?.rental_price_per_day || 0) * days
+  const rentalTotal = (selectedAsset?.rental_price || 0) * days
   const discountAmt = (rentalTotal * discountPercent) / 100
   const totalCost = rentalTotal - discountAmt
   const deposit = isGuest ? totalCost * 0.5 : 0
@@ -109,7 +109,7 @@ function AjukanPeminjaman({ selectedAssetId }) {
                 disabled={!selectedUnitId}
                 style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }}>
                 <option value="">{!selectedUnitId ? '-- Pilih unit dulu --' : '-- Pilih aset --'}</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code}) - {fmtIDR(a.rental_price_per_day)}/hari</option>)}
+                {assets.map(a => <option key={a.id} value={a.id}>{a.nama_barang} ({a.kode_barang || '-'}) - {fmtIDR(a.rental_price)}{a.rental_unit ? '/' + a.rental_unit.replace('per_', '') : '/hari'}</option>)}
               </select>
             </div>
 
@@ -171,7 +171,7 @@ function AjukanPeminjaman({ selectedAssetId }) {
                 <Building2 size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
                 Unit: {selectedAsset.unit?.name || '-'}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Biaya sewa/hari</span><span>{fmtIDR(selectedAsset.rental_price_per_day)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Biaya sewa/hari</span><span>{fmtIDR(selectedAsset.rental_price)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Durasi</span><span>{days} hari</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><span style={{ color: '#666' }}>Subtotal</span><span>{fmtIDR(rentalTotal)}</span></div>
               {discountPercent > 0 && (

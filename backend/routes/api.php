@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AssetController;
+use App\Http\Controllers\Api\AssetRequestController;
 use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
@@ -72,13 +73,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/units-list', [UnitController::class, 'index']);
     Route::get('/locations-list', [LocationController::class, 'index']);
 
-    // Asset routes
+    // =============================================
+    //  ASSET ROUTES (Revised for BMN + Gudang)
+    // =============================================
     Route::prefix('assets')->group(function () {
+        // List & Detail (all authenticated users, role-based filtering in controller)
         Route::get('/', [AssetController::class, 'index']);
         Route::get('/{id}', [AssetController::class, 'show']);
         Route::get('/{id}/history', [AssetController::class, 'history']);
-        
-        // Admin/Operator only routes
+
+        // Import Excel (Admin Unit only)
+        Route::middleware('role:ADMIN_UNIT')->group(function () {
+            Route::post('/import', [AssetController::class, 'import']);
+        });
+
+        // Create / Update / Delete (Admin + Operator)
         Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT,OPERATOR')->group(function () {
             Route::post('/', [AssetController::class, 'store']);
             Route::put('/{id}', [AssetController::class, 'update']);
@@ -86,6 +95,48 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/{id}/status', [AssetController::class, 'updateStatus']);
             Route::post('/{id}/transfer', [AssetController::class, 'transfer']);
             Route::delete('/{id}', [AssetController::class, 'destroy']);
+        });
+
+        // Borrowable toggle (Admin Unit only)
+        Route::middleware('role:ADMIN_UNIT')->group(function () {
+            Route::patch('/{id}/toggle-borrowable', [AssetController::class, 'toggleBorrowable']);
+            Route::post('/{id}/assign-unit', [AssetController::class, 'assignToUnit']);
+        });
+
+        // Set rental price (Operator only)
+        Route::middleware('role:OPERATOR')->group(function () {
+            Route::patch('/{id}/rental-price', [AssetController::class, 'setRentalPrice']);
+        });
+
+        // Claim from Gudang (Operator only)
+        Route::middleware('role:OPERATOR')->group(function () {
+            Route::post('/{id}/claim', [AssetController::class, 'claim']);
+        });
+    });
+
+    // Gudang (warehouse) route — accessible by Admin Unit + Operator
+    Route::middleware('role:SUPER_ADMIN,ADMIN_UNIT,OPERATOR')->group(function () {
+        Route::get('/gudang', [AssetController::class, 'gudang']);
+    });
+
+    // =============================================
+    //  ASSET REQUEST (Approval workflow)
+    // =============================================
+    Route::prefix('asset-requests')->group(function () {
+        // List requests (Admin sees all, Operator sees own)
+        Route::get('/', [AssetRequestController::class, 'index']);
+        Route::get('/pending-count', [AssetRequestController::class, 'pendingCount']);
+
+        // Operator submits requests
+        Route::middleware('role:OPERATOR')->group(function () {
+            Route::post('/claim/{assetId}', [AssetRequestController::class, 'requestClaim']);
+            Route::post('/transfer/{assetId}', [AssetRequestController::class, 'requestTransfer']);
+        });
+
+        // Admin Unit reviews requests
+        Route::middleware('role:ADMIN_UNIT')->group(function () {
+            Route::patch('/{id}/approve', [AssetRequestController::class, 'approve']);
+            Route::patch('/{id}/reject', [AssetRequestController::class, 'reject']);
         });
     });
 

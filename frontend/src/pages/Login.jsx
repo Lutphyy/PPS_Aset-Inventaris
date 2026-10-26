@@ -251,131 +251,89 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-box">
-        {/* LEFT SIDE - BRANDING */}
-        <div className="login-brand">
-          <div className="brand-content">
-            <div className="brand-logo">
-              <div className="logo-mark">S</div>
-              <div>
-                <h1>SISETRIS</h1>
-                <p>Sistem Pengelolaan Aset & Inventaris</p>
+    <div className="login-container" style={{ backgroundImage: "url('/bgfttk.webp')" }}>
+      <div className="login-card">
+        <div className="form-content">
+          {mode === 'login' ? (
+            <>
+              {/* LOGIN FORM */}
+              <div className="login-card-brand">
+                <div className="login-card-logo">S</div>
+                <div>
+                  <h1>SISETRIS</h1>
+                  <p>Sistem Pengelolaan Aset & Inventaris</p>
+                </div>
               </div>
-            </div>
 
-            <div className="brand-features">
-              <div className="feature-item">
-                <span>✓</span>
-                <p>Kelola aset dengan mudah</p>
+              <div className="form-header">
+                <h2>Selamat Datang</h2>
+                <p>Silakan login untuk melanjutkan</p>
               </div>
-              <div className="feature-item">
-                <span>✓</span>
-                <p>Tracking real-time</p>
-              </div>
-              <div className="feature-item">
-                <span>✓</span>
-                <p>Peminjaman terstruktur</p>
-              </div>
-              <div className="feature-item">
-                <span>✓</span>
-                <p>Laporan otomatis</p>
-              </div>
-            </div>
 
-            <div style={{ marginTop: '32px', padding: '16px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, opacity: 0.9 }}>💡 Mekanisme Biaya:</p>
-              <div style={{ fontSize: '12px', opacity: 0.85, lineHeight: 1.6 }}>
-                <p style={{ margin: '4px 0' }}>🎓 <strong>Civitas Kampus</strong> → Diskon 50%</p>
-                <p style={{ margin: '4px 0' }}>👤 <strong>Tamu / Eksternal</strong> → Tarif penuh + Deposit 50%</p>
-              </div>
-            </div>
-          </div>
+              {error && (
+                <div className="alert alert-error">{error}</div>
+              )}
 
-          <p className="brand-footer">
-            © 2026 SISETRIS. Universitas Maritim
-          </p>
-        </div>
-
-        {/* RIGHT SIDE */}
-        <div className="login-form-side">
-          <div className="form-content">
-            {mode === 'login' ? (
-              <>
-                {/* LOGIN FORM */}
-                <div className="form-header">
-                  <h2>Selamat Datang</h2>
-                  <p>Silakan login untuk melanjutkan</p>
+              <form onSubmit={handleLogin}>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    placeholder="user@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
                 </div>
 
-                {error && (
-                  <div className="alert alert-error">{error}</div>
-                )}
-
-                <form onSubmit={handleLogin}>
-                  <div className="form-group">
-                    <label>Email</label>
+                <div className="form-group">
+                  <label>Password</label>
+                  <div className="password-field">
                     <input
-                      type="email"
-                      placeholder="user@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
                     />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
-
-                  <div className="form-group">
-                    <label>Password</label>
-                    <div className="password-field">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={loading}
-                      />
-                      <button
-                        type="button"
-                        className="toggle-password"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn-login"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>Loading...</>
-                    ) : (
-                      <>
-                        <LogIn size={18} />
-                        <span>Login</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-
-                <div className="form-footer">
-                  <p>
-                    Bukan civitas kampus?{' '}
-                    <a href="#" onClick={(e) => { e.preventDefault(); resetForm(); setMode('register') }}>
-                      Daftar sebagai Tamu
-                    </a>
-                  </p>
-                  <p className="demo-info">
-                    <strong>Demo Credentials:</strong><br />
-                    admin@sisetris.id / password123
-                  </p>
                 </div>
-              </>
+
+                <button
+                  type="submit"
+                  className="btn-login"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>Loading...</>
+                  ) : (
+                    <>
+                      <LogIn size={18} />
+                      <span>Login</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="form-footer">
+                <p>
+                  Bukan civitas kampus?{' '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); resetForm(); setMode('register') }}>
+                    Daftar sebagai Tamu
+                  </a>
+                </p>
+              </div>
+            </>
             ) : (
               <>
                 {/* GUEST REGISTRATION FORM */}
@@ -675,7 +633,6 @@ function Login({ onLogin }) {
               </>
             )}
           </div>
-        </div>
       </div>
     </div>
   )
