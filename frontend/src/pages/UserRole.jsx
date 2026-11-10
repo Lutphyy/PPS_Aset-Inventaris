@@ -27,6 +27,8 @@ function UserRole() {
   const [editingUser, setEditingUser] = useState(null)
   const [editRole, setEditRole] = useState('')
   const [editUnitId, setEditUnitId] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 25
 
   const [newUser, setNewUser] = useState({
     name: '', email: '', password: '', phone: '', role: 'BORROWER', unit_id: ''
@@ -131,6 +133,46 @@ function UserRole() {
   const guestCount = users.filter(u => u.is_guest).length
   const pendingGuests = users.filter(u => u.is_guest && u.verification_status !== 'TERVERIFIKASI').length
 
+  const totalPages = Math.ceil(filtered.length / perPage)
+  const safePage = Math.min(currentPage, totalPages || 1)
+  const paginatedUsers = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+    const current = safePage
+    const total = totalPages
+    const pages = []
+    if (current > 3) pages.push(1)
+    if (current > 4) pages.push('...')
+    for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+    if (current < total - 3) pages.push('...')
+    if (current < total - 2) pages.push(total)
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({filtered.length} user)</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => setCurrentPage(current - 1)} disabled={current <= 1}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+            ‹ Prev
+          </button>
+          {pages.map((p, i) =>
+            p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+              <button key={p} onClick={() => setCurrentPage(p)}
+                style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                  background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setCurrentPage(current + 1)} disabled={current >= total}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+            Next ›
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="asset-page">
       <div className="asset-page-header">
@@ -210,9 +252,9 @@ function UserRole() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr>
-              ) : filtered.length === 0 ? (
+              ) : paginatedUsers.length === 0 ? (
                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada data user</td></tr>
-              ) : filtered.map(u => (
+              ) : paginatedUsers.map(u => (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 600 }}>{u.name}</td>
                   <td style={{ color: '#666', fontSize: '11px' }}>{u.email}</td>
@@ -334,6 +376,7 @@ function UserRole() {
             </tbody>
           </table>
         </div>
+        {renderPagination()}
       </div>
 
       {/* Guest Detail Modal */}

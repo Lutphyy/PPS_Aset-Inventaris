@@ -22,6 +22,8 @@ function KelolaUnit() {
   const [locations, setLocations] = useState([])
   const [locSaving, setLocSaving] = useState(false)
   const [activeUnitId, setActiveUnitId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 25
 
   useEffect(() => { fetchUnits() }, [])
 
@@ -129,6 +131,46 @@ function KelolaUnit() {
     finally { setLocSaving(false) }
   }
 
+  const totalPages = Math.ceil(units.length / perPage)
+  const safePage = Math.min(currentPage, totalPages || 1)
+  const paginatedUnits = units.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+    const current = safePage
+    const total = totalPages
+    const pages = []
+    if (current > 3) pages.push(1)
+    if (current > 4) pages.push('...')
+    for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+    if (current < total - 3) pages.push('...')
+    if (current < total - 2) pages.push(total)
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({units.length} unit)</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => setCurrentPage(current - 1)} disabled={current <= 1}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+            ‹ Prev
+          </button>
+          {pages.map((p, i) =>
+            p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+              <button key={p} onClick={() => setCurrentPage(p)}
+                style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                  background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setCurrentPage(current + 1)} disabled={current >= total}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+            Next ›
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="asset-page">
       <div className="asset-page-header">
@@ -167,9 +209,9 @@ function KelolaUnit() {
               <tbody>
                 {loading ? (
                   <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Memuat data...</td></tr>
-                ) : units.length === 0 ? (
+                ) : paginatedUnits.length === 0 ? (
                   <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada unit</td></tr>
-                ) : units.map(unit => (
+                ) : paginatedUnits.map(unit => (
                   <tr key={unit.id} style={{ background: activeUnitId === unit.id ? '#f0f4ff' : undefined, cursor: 'pointer' }}
                     onClick={() => handleViewLocations(unit)}>
                     <td><span className="asset-code">{unit.code}</span></td>
@@ -187,6 +229,7 @@ function KelolaUnit() {
               </tbody>
             </table>
           </div>
+          {renderPagination()}
         </div>
 
         {/* LOCATIONS LIST (shown when a unit is selected) */}

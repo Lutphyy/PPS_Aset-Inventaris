@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Search, Package, ArrowDownToLine, Eye, X } from 'lucide-react'
-import { assetsAPI, assetRequestsAPI, unitsAPI, locationsAPI } from '../utils/api'
+import { useState, useEffect, useRef } from 'react'
+import { Search, Package, ArrowDownToLine, Eye, X, Upload, Plus, FileSpreadsheet, CheckCircle, XCircle } from 'lucide-react'
+import { assetsAPI, assetRequestsAPI, unitsAPI, locationsAPI, masterDataAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
 const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
@@ -35,12 +35,39 @@ function Gudang() {
   const [locations, setLocations] = useState([])
 
   const isAdmin = ['SUPER_ADMIN', 'ADMIN_UNIT'].includes(user.role)
+  const isAdminUnit = user.role === 'ADMIN_UNIT'
   const isOperator = user.role === 'OPERATOR'
+
+  // Import state
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const fileInputRef = useRef(null)
+
+  // Tambah aset state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addSaving, setAddSaving] = useState(false)
+  const [masterConditions, setMasterConditions] = useState([])
+  const [masterStatuses, setMasterStatuses] = useState([])
+  const defaultAddData = { nama_barang: '', kode_register: '', kode_barang: '', nup: '', jenis_bmn: '', kondisi: '', notes: '' }
+  const [addData, setAddData] = useState({ ...defaultAddData })
 
   useEffect(() => {
     fetchGudang()
     if (isAdmin) fetchUnits()
+    fetchMasterData()
   }, [])
+
+  const fetchMasterData = async () => {
+    try {
+      const res = await masterDataAPI.getAll()
+      if (res.success) {
+        setMasterConditions(res.data.conditions || [])
+        setMasterStatuses(res.data.statuses || [])
+      }
+    } catch (err) { console.error(err) }
+  }
 
   const fetchGudang = async (page = 1) => {
     try {
@@ -81,6 +108,44 @@ function Gudang() {
       fetchGudang(pagination.page)
     } catch (err) {
       toast.error('Gagal mengajukan klaim: ' + err.message)
+    }
+  }
+
+  // ===== IMPORT HANDLER =====
+  const handleImport = async () => {
+    if (!importFile) return toast.error('Pilih file Excel terlebih dahulu')
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const result = await assetsAPI.importExcel(importFile)
+      setImportResult(result.data)
+      toast.success(result.message)
+      fetchGudang()
+    } catch (err) {
+      toast.error('Gagal import: ' + err.message)
+      setImportResult({ error: err.message })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  // ===== TAMBAH ASET =====
+  const handleAddSubmit = async (e) => {
+    e.preventDefault()
+    if (!addData.nama_barang || !addData.kode_register || !addData.nup || !addData.jenis_bmn) {
+      return toast.error('Nama Barang, Kode Register, NUP, dan Jenis BMN wajib diisi')
+    }
+    setAddSaving(true)
+    try {
+      await assetsAPI.create(addData)
+      toast.success('Aset berhasil ditambahkan ke Gudang!')
+      setShowAddModal(false)
+      setAddData({ ...defaultAddData })
+      fetchGudang()
+    } catch (err) {
+      toast.error('Gagal menambah: ' + err.message)
+    } finally {
+      setAddSaving(false)
     }
   }
 
@@ -168,9 +233,25 @@ function Gudang() {
           <h1>📦 Gudang Aset</h1>
           <p>Aset yang belum diklaim oleh unit manapun</p>
         </div>
-        <span className="asset-total" style={{ background: '#f5f0ff', color: '#7C57D6', padding: '8px 16px', borderRadius: '10px', fontWeight: 700 }}>
-          {pagination.total} Aset di Gudang
-        </span>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="asset-total" style={{ background: '#f5f0ff', color: '#7C57D6', padding: '8px 16px', borderRadius: '10px', fontWeight: 700 }}>
+            {pagination.total} Aset
+          </span>
+          {isAdminUnit && (
+            <>
+              <button type="button" className="add-asset-button"
+                style={{ background: 'linear-gradient(135deg, #149E93, #0d7a71)', border: 'none' }}
+                onClick={() => { setShowImport(true); setImportFile(null); setImportResult(null) }}>
+                <Upload size={17} strokeWidth={2} />
+                <span>Import Excel</span>
+              </button>
+              <button type="button" className="add-asset-button" onClick={() => { setAddData({ ...defaultAddData }); setShowAddModal(true) }}>
+                <Plus size={17} strokeWidth={2} />
+                <span>Tambah Aset</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* FILTERS */}
@@ -181,23 +262,13 @@ function Gudang() {
             value={search} onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchGudang(1)} />
         </div>
-        <div className="asset-filter">
-          <select value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
-            <option value="">Semua Jenis BMN</option>
-            <option value="MESIN PERALATAN NON TIK">Mesin Peralatan Non TIK</option>
-            <option value="ASET TETAP LAINNYA">Aset Tetap Lainnya</option>
-            <option value="MESIN PERALATAN KHUSUS TIK">Mesin Peralatan Khusus TIK</option>
-            <option value="INSTALASI DAN JARINGAN">Instalasi dan Jaringan</option>
-            <option value="BANGUNAN DAN GEDUNG">Bangunan dan Gedung</option>
-            <option value="KENDARAAN BERMOTOR">Kendaraan Bermotor</option>
-          </select>
-        </div>
+
         <div className="asset-filter">
           <select value={filterKondisi} onChange={(e) => setFilterKondisi(e.target.value)}>
             <option value="">Semua Kondisi</option>
-            <option value="Baik">Baik</option>
-            <option value="Rusak Ringan">Rusak Ringan</option>
-            <option value="Rusak Berat">Rusak Berat</option>
+            {masterConditions.map(c => (
+              <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+            ))}
           </select>
         </div>
         <button className="add-asset-button" style={{ padding: '8px 14px' }} onClick={() => fetchGudang(1)}>Cari</button>
@@ -345,6 +416,123 @@ function Gudang() {
               <div className="modal-footer" style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '1px solid #eee' }}>
                 <button type="button" onClick={() => setShowAssign(false)} style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>Batal</button>
                 <button type="submit" className="add-asset-button">Assign</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT MODAL */}
+      {showImport && (
+        <div className="modal-overlay" onClick={() => !importing && setShowImport(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📥 Import Aset dari Excel</h2>
+              <button onClick={() => !importing && setShowImport(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body" style={{ padding: '1.5rem' }}>
+              <div style={{ background: '#f5f0ff', padding: '14px', borderRadius: '10px', marginBottom: '16px', fontSize: '13px' }}>
+                <strong>Format:</strong> File Excel (.xlsx) dengan kolom BMN standar.<br />
+                <span style={{ color: '#666' }}>Semua aset yang diimport akan masuk ke <strong>Gudang</strong>.</span>
+              </div>
+              <div style={{ border: '2px dashed #ddd', borderRadius: '10px', padding: '24px', textAlign: 'center', cursor: 'pointer', background: importFile ? '#f0fff4' : '#fafbff' }}
+                onClick={() => fileInputRef.current?.click()}>
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden
+                  onChange={(e) => setImportFile(e.target.files[0])} />
+                <FileSpreadsheet size={32} strokeWidth={1.2} style={{ color: importFile ? '#299579' : '#bbb', marginBottom: '8px' }} />
+                <div style={{ fontSize: '13px', color: importFile ? '#299579' : '#888' }}>
+                  {importFile ? `✅ ${importFile.name}` : 'Klik untuk pilih file Excel'}
+                </div>
+              </div>
+              {importResult && (
+                <div style={{ marginTop: '14px', padding: '12px', borderRadius: '8px', fontSize: '12px',
+                  background: importResult.error ? '#fde8e8' : '#e4f6f0', color: importResult.error ? '#d14343' : '#299579' }}>
+                  {importResult.error ? (
+                    <><XCircle size={14} /> {importResult.error}</>
+                  ) : (
+                    <><CheckCircle size={14} /> Berhasil import {importResult.imported} aset{importResult.skipped > 0 ? `, ${importResult.skipped} dilewati` : ''}</>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '1px solid #eee' }}>
+              <button type="button" onClick={() => setShowImport(false)} disabled={importing}
+                style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>
+                Batal
+              </button>
+              <button type="button" onClick={handleImport} disabled={importing || !importFile}
+                className="add-asset-button" style={{ opacity: importing || !importFile ? 0.6 : 1 }}>
+                {importing ? 'Mengimport...' : 'Import Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAMBAH ASET MODAL */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => !addSaving && setShowAddModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>➕ Tambah Aset ke Gudang</h2>
+              <button onClick={() => !addSaving && setShowAddModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAddSubmit}>
+              <div className="modal-body" style={{ padding: '1.5rem', display: 'grid', gap: '12px' }}>
+                <div style={{ background: '#f5f0ff', padding: '12px', borderRadius: '8px', fontSize: '12px', color: '#7C57D6' }}>
+                  📦 Aset yang ditambahkan akan masuk ke <strong>Gudang</strong> dan bisa diklaim oleh operator unit.
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Nama Barang *</label>
+                  <input type="text" value={addData.nama_barang} onChange={e => setAddData({ ...addData, nama_barang: e.target.value })} required
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Kode Register *</label>
+                    <input type="text" value={addData.kode_register} onChange={e => setAddData({ ...addData, kode_register: e.target.value })} required
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>NUP *</label>
+                    <input type="text" value={addData.nup} onChange={e => setAddData({ ...addData, nup: e.target.value })} required
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Kode Barang</label>
+                    <input type="text" value={addData.kode_barang} onChange={e => setAddData({ ...addData, kode_barang: e.target.value })}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Jenis BMN *</label>
+                    <input type="text" value={addData.jenis_bmn} onChange={e => setAddData({ ...addData, jenis_bmn: e.target.value })} required
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Kondisi</label>
+                  <select value={addData.kondisi} onChange={e => setAddData({ ...addData, kondisi: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px' }}>
+                    <option value="">Pilih Kondisi</option>
+                    {masterConditions.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#555' }}>Catatan</label>
+                  <textarea value={addData.notes} onChange={e => setAddData({ ...addData, notes: e.target.value })} rows="2"
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', resize: 'vertical' }} />
+                </div>
+              </div>
+              <div style={{ padding: '1rem 1.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '1px solid #eee' }}>
+                <button type="button" onClick={() => setShowAddModal(false)} disabled={addSaving}
+                  style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>
+                  Batal
+                </button>
+                <button type="submit" className="add-asset-button" disabled={addSaving} style={{ opacity: addSaving ? 0.6 : 1 }}>
+                  {addSaving ? 'Menyimpan...' : 'Tambah ke Gudang'}
+                </button>
               </div>
             </form>
           </div>

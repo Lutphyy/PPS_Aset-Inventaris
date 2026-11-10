@@ -212,5 +212,14 @@ Route::middleware('auth:sanctum')->group(function () {
                 ]
             ]);
         });
+
+        // Asset-specific logs (Log Barang)
+        Route::get('/asset-logs', [AssetController::class, 'assetLogs']);
+    });
+
+    // Pelepasan & Pemusnahan routes (Admin Unit only)
+    Route::middleware('role:ADMIN_UNIT')->group(function () {
+        Route::get('/disposed-assets', [AssetController::class, 'disposedAssets']);
+        Route::post('/assets/{id}/dispose', [AssetController::class, 'dispose']);
     });
 });

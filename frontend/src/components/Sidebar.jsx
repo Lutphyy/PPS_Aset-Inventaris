@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Package, ArrowRightLeft, Undo2, Users,
   FileText, History, Settings, LogOut, Wrench, MapPin,
   Plus, ClipboardCheck, DollarSign, Eye, Building2, SlidersHorizontal,
-  Warehouse,
+  Warehouse, Trash2,
 } from 'lucide-react'
 
 // Menu config per role
@@ -22,6 +22,7 @@ const ROLE_MENUS = {
     { id: 'data-aset', label: 'Data Aset', icon: Package },
     { id: 'gudang', label: 'Gudang Aset', icon: Warehouse },
     { id: 'persetujuan-aset', label: 'Persetujuan Aset', icon: ClipboardCheck },
+    { id: 'pelepasan-pemusnahan', label: 'Pelepasan & Pemusnahan', icon: Trash2 },
     { id: 'kelola-unit', label: 'Unit & Lokasi', icon: Building2 },
     { id: 'kelola-master', label: 'Manajemen Master', icon: SlidersHorizontal },
     { id: 'peminjaman', label: 'Peminjaman', icon: ArrowRightLeft },
@@ -96,7 +97,7 @@ function Sidebar({ activePage, setActivePage, user, onLogout, badgeCounts = {}, 
       {/* LOGO */}
       <div className="logo">
         <div className="logo-icon">
-          <Package size={21} strokeWidth={2} />
+          <img src="/logo.png" alt="SISETRIS" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
         </div>
         <div className="logo-text">
           <div className="logo-name">SISETRIS</div>

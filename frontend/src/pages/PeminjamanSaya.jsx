@@ -14,12 +14,54 @@ function PeminjamanSaya() {
   const [loans, setLoans] = useState([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 25
 
   useEffect(() => {
     loansAPI.getMyLoans().then(res => { setLoans(res.data || []); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
   const activeLoans = loans.filter(l => ['MENUNGGU', 'DISETUJUI', 'AKTIF'].includes(l.status))
+
+  const totalPages = Math.ceil(activeLoans.length / perPage)
+  const safePage = Math.min(currentPage, totalPages || 1)
+  const paginatedLoans = activeLoans.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+    const current = safePage
+    const total = totalPages
+    const pages = []
+    if (current > 3) pages.push(1)
+    if (current > 4) pages.push('...')
+    for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+    if (current < total - 3) pages.push('...')
+    if (current < total - 2) pages.push(total)
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({activeLoans.length} data)</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => setCurrentPage(current - 1)} disabled={current <= 1}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+            ‹ Prev
+          </button>
+          {pages.map((p, i) =>
+            p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+              <button key={p} onClick={() => setCurrentPage(p)}
+                style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                  background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setCurrentPage(current + 1)} disabled={current >= total}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+            Next ›
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="asset-page">
@@ -31,8 +73,8 @@ function PeminjamanSaya() {
             <thead><tr><th>ID</th><th>Aset</th><th>Tgl Pinjam</th><th>Estimasi Kembali</th><th>Total Biaya</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody>
               {loading ? <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr> :
-               activeLoans.length === 0 ? <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada peminjaman aktif</td></tr> :
-               activeLoans.map(l => (
+               paginatedLoans.length === 0 ? <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada peminjaman aktif</td></tr> :
+               paginatedLoans.map(l => (
                 <tr key={l.id}>
                   <td style={{ fontWeight: 600 }}>#{l.id}</td>
                   <td>{l.asset?.name || '-'}</td>
@@ -46,6 +88,7 @@ function PeminjamanSaya() {
             </tbody>
           </table>
         </div>
+        {renderPagination()}
       </div>
       {detail && (
         <div className="modal-overlay" onClick={() => setDetail(null)}>

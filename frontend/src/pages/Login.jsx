@@ -258,7 +258,9 @@ function Login({ onLogin }) {
             <>
               {/* LOGIN FORM */}
               <div className="login-card-brand">
-                <div className="login-card-logo">S</div>
+                <div className="login-card-logo">
+                  <img src="/logo.png" alt="SISETRIS" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
+                </div>
                 <div>
                   <h1>SISETRIS</h1>
                   <p>Sistem Pengelolaan Aset & Inventaris</p>

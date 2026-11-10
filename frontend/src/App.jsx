@@ -26,6 +26,7 @@ import KelolaUnit from './pages/KelolaUnit'
 import KelolaMaster from './pages/KelolaMaster'
 import Gudang from './pages/Gudang'
 import PersetujuanAset from './pages/PersetujuanAset'
+import PelepasanPemusnahan from './pages/PelepasanPemusnahan'
 
 import { dashboardAPI, assetRequestsAPI } from './utils/api'
 
@@ -164,6 +165,8 @@ function App() {
       case 'persetujuan-aset':
       case 'permintaan-aset':
         return <PersetujuanAset />
+      case 'pelepasan-pemusnahan':
+        return <PelepasanPemusnahan />
       default:
         return <Dashboard />
     }

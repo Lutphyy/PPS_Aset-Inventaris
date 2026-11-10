@@ -9,17 +9,15 @@ function KelolaMaster() {
   const [saving, setSaving] = useState('')
 
   // Current (editable) state
-  const [categories, setCategories] = useState([])
   const [conditions, setConditions] = useState([])
   const [statuses, setStatuses] = useState([])
 
   // Original (saved) state — for dirty checking
-  const [origCategories, setOrigCategories] = useState([])
   const [origConditions, setOrigConditions] = useState([])
   const [origStatuses, setOrigStatuses] = useState([])
 
   // New item inputs
-  const [newItem, setNewItem] = useState({ categories: '', conditions: '', statuses: '' })
+  const [newItem, setNewItem] = useState({ conditions: '', statuses: '' })
 
   // Editing state: { sectionKey: index } or null
   const [editingItem, setEditingItem] = useState(null)
@@ -38,13 +36,10 @@ function KelolaMaster() {
       setLoading(true)
       const res = await masterDataAPI.getAll()
       if (res.success) {
-        const cats = res.data.categories || []
         const conds = res.data.conditions || []
         const stats = res.data.statuses || []
-        setCategories([...cats])
         setConditions([...conds])
         setStatuses([...stats])
-        setOrigCategories([...cats])
         setOrigConditions([...conds])
         setOrigStatuses([...stats])
       }
@@ -54,8 +49,8 @@ function KelolaMaster() {
 
   // Check if a section has unsaved changes
   const isDirty = (key) => {
-    const current = key === 'categories' ? categories : key === 'conditions' ? conditions : statuses
-    const original = key === 'categories' ? origCategories : key === 'conditions' ? origConditions : origStatuses
+    const current = key === 'conditions' ? conditions : statuses
+    const original = key === 'conditions' ? origConditions : origStatuses
     if (current.length !== original.length) return true
     return current.some((item, i) => item !== original[i])
   }
@@ -64,23 +59,21 @@ function KelolaMaster() {
   const addItem = (type) => {
     const val = newItem[type].trim().toUpperCase().replace(/\s+/g, '_')
     if (!val) return
-    const getter = type === 'categories' ? categories : type === 'conditions' ? conditions : statuses
-    // For categories, keep original casing
-    const finalVal = type === 'categories' ? newItem[type].trim() : val
-    if (getter.some(item => item.toUpperCase() === finalVal.toUpperCase())) {
+    const getter = type === 'conditions' ? conditions : statuses
+    if (getter.some(item => item.toUpperCase() === val.toUpperCase())) {
       toast.error('Item sudah ada')
       return
     }
-    const setter = type === 'categories' ? setCategories : type === 'conditions' ? setConditions : setStatuses
-    setter([...getter, finalVal])
+    const setter = type === 'conditions' ? setConditions : setStatuses
+    setter([...getter, val])
     setNewItem(p => ({ ...p, [type]: '' }))
   }
 
   // Remove item
   const removeItem = (type, index) => {
-    const getter = type === 'categories' ? [...categories] : type === 'conditions' ? [...conditions] : [...statuses]
+    const getter = type === 'conditions' ? [...conditions] : [...statuses]
     if (getter.length <= 1) { toast.error('Minimal harus ada 1 item'); return }
-    const setter = type === 'categories' ? setCategories : type === 'conditions' ? setConditions : setStatuses
+    const setter = type === 'conditions' ? setConditions : setStatuses
     getter.splice(index, 1)
     setter(getter)
     // Cancel editing if the edited item is removed
@@ -91,7 +84,7 @@ function KelolaMaster() {
 
   // Start editing
   const startEdit = (key, index) => {
-    const data = key === 'categories' ? categories : key === 'conditions' ? conditions : statuses
+    const data = key === 'conditions' ? conditions : statuses
     setEditingItem({ key, index })
     setEditValue(data[index])
   }
@@ -102,16 +95,15 @@ function KelolaMaster() {
     const val = editValue.trim()
     if (!val) { toast.error('Nama tidak boleh kosong'); return }
     const { key, index } = editingItem
-    // For conditions/statuses, uppercase with underscores
-    const finalVal = key === 'categories' ? val : val.toUpperCase().replace(/\s+/g, '_')
-    const getter = key === 'categories' ? [...categories] : key === 'conditions' ? [...conditions] : [...statuses]
+    const finalVal = val.toUpperCase().replace(/\s+/g, '_')
+    const getter = key === 'conditions' ? [...conditions] : [...statuses]
     // Check duplicate (excluding current item)
     if (getter.some((item, i) => i !== index && item.toUpperCase() === finalVal.toUpperCase())) {
       toast.error('Item sudah ada')
       return
     }
     getter[index] = finalVal
-    const setter = key === 'categories' ? setCategories : key === 'conditions' ? setConditions : setStatuses
+    const setter = key === 'conditions' ? setConditions : setStatuses
     setter(getter)
     setEditingItem(null)
     setEditValue('')
@@ -125,8 +117,8 @@ function KelolaMaster() {
 
   // Discard changes for a section
   const discardChanges = (key) => {
-    const origSetter = key === 'categories' ? origCategories : key === 'conditions' ? origConditions : origStatuses
-    const setter = key === 'categories' ? setCategories : key === 'conditions' ? setConditions : setStatuses
+    const origSetter = key === 'conditions' ? origConditions : origStatuses
+    const setter = key === 'conditions' ? setConditions : setStatuses
     setter([...origSetter])
     setEditingItem(null)
   }
@@ -135,13 +127,12 @@ function KelolaMaster() {
   const saveItems = async (type) => {
     setSaving(type)
     try {
-      const items = type === 'categories' ? categories : type === 'conditions' ? conditions : statuses
-      const fn = type === 'categories' ? masterDataAPI.updateCategories : type === 'conditions' ? masterDataAPI.updateConditions : masterDataAPI.updateStatuses
+      const items = type === 'conditions' ? conditions : statuses
+      const fn = type === 'conditions' ? masterDataAPI.updateConditions : masterDataAPI.updateStatuses
       const res = await fn(items)
       if (res.success) {
         toast.success(res.message || 'Berhasil disimpan!')
-        // Update originals after successful save
-        const origSetter = type === 'categories' ? setOrigCategories : type === 'conditions' ? setOrigConditions : setOrigStatuses
+        const origSetter = type === 'conditions' ? setOrigConditions : setOrigStatuses
         origSetter([...items])
       }
     } catch (err) { toast.error('Gagal menyimpan: ' + err.message) }
@@ -151,7 +142,6 @@ function KelolaMaster() {
   const label = (s) => s?.replace(/_/g, ' ') || s
 
   const sections = [
-    { key: 'categories', title: 'Kategori Aset', desc: 'Daftar kategori untuk klasifikasi aset', icon: Tag, color: '#7355d8', bg: '#eee9ff', data: categories },
     { key: 'conditions', title: 'Kondisi Aset', desc: 'Daftar kondisi fisik aset', icon: Activity, color: '#d79b32', bg: '#fff4dd', data: conditions },
     { key: 'statuses', title: 'Status Aset', desc: 'Daftar status ketersediaan aset', icon: ToggleLeft, color: '#35a483', bg: '#e4f6f0', data: statuses },
   ]
@@ -165,7 +155,7 @@ function KelolaMaster() {
       <div className="asset-page-header">
         <div>
           <h1>Manajemen Master Data</h1>
-          <p>Kelola kategori, kondisi, dan status aset. Klik item untuk mengedit nama.</p>
+          <p>Kelola kondisi dan status aset. Klik item untuk mengedit nama.</p>
         </div>
       </div>
 

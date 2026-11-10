@@ -375,8 +375,24 @@ export const activityLogsAPI = {
   getAll: (params = {}) => apiFetch(`/activity-logs${buildQuery(params)}`),
 }
 
+// Asset Logs API (Log Barang - detail per asset)
+export const assetLogsAPI = {
+  getAll: (params = {}) => apiFetch(`/asset-logs${buildQuery(params)}`),
+}
+
+// Disposed Assets API (Pelepasan & Pemusnahan)
+export const disposedAssetsAPI = {
+  getAll: (params = {}) => apiFetch(`/disposed-assets${buildQuery(params)}`),
+
+  dispose: (id, formData) =>
+    apiFetch(`/assets/${id}/dispose`, {
+      method: 'POST',
+      body: formData
+    }),
+}
+
 export default {
   authAPI, assetsAPI, assetRequestsAPI, loansAPI, usersAPI, dashboardAPI, masterDataAPI,
-  agreementsAPI, paymentsAPI, reportsAPI, activityLogsAPI,
+  agreementsAPI, paymentsAPI, reportsAPI, activityLogsAPI, assetLogsAPI, disposedAssetsAPI,
   unitsAPI, locationsAPI,
 }

@@ -13,8 +13,10 @@ function MonitoringAgreement() {
   const [showDetail, setShowDetail] = useState(null)
   const [violateId, setViolateId] = useState(null)
   const [violateNotes, setViolateNotes] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 25
 
-  useEffect(() => { fetchAgreements() }, [filter])
+  useEffect(() => { fetchAgreements(); setCurrentPage(1) }, [filter])
 
   const fetchAgreements = async () => {
     try {
@@ -41,6 +43,46 @@ function MonitoringAgreement() {
     return <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 600, background: cl.bg, color: cl.c }}>{statusLabel(s)}</span>
   }
 
+  const totalPages = Math.ceil(agreements.length / perPage)
+  const safePage = Math.min(currentPage, totalPages || 1)
+  const paginatedAgreements = agreements.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+    const current = safePage
+    const total = totalPages
+    const pages = []
+    if (current > 3) pages.push(1)
+    if (current > 4) pages.push('...')
+    for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+    if (current < total - 3) pages.push('...')
+    if (current < total - 2) pages.push(total)
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({agreements.length} data)</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => setCurrentPage(current - 1)} disabled={current <= 1}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+            ‹ Prev
+          </button>
+          {pages.map((p, i) =>
+            p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+              <button key={p} onClick={() => setCurrentPage(p)}
+                style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                  background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setCurrentPage(current + 1)} disabled={current >= total}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+            Next ›
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="asset-page">
       <div className="asset-page-header"><div><h1>Monitoring Agreement</h1><p>Pantau seluruh perjanjian peminjaman</p></div></div>
@@ -61,7 +103,7 @@ function MonitoringAgreement() {
             <tbody>
               {loading ? <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr> :
                agreements.length === 0 ? <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada data agreement</td></tr> :
-               agreements.map(a => (
+               paginatedAgreements.map(a => (
                 <tr key={a.id}>
                   <td style={{ fontWeight: 600 }}>#{a.id}</td>
                   <td>{a.user?.name || '-'}</td>
@@ -81,6 +123,7 @@ function MonitoringAgreement() {
             </tbody>
           </table>
         </div>
+        {renderPagination()}
       </div>
 
       {showDetail && (

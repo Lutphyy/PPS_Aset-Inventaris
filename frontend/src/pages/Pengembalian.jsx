@@ -14,6 +14,8 @@ function Pengembalian() {
   const [returnCondition, setReturnCondition] = useState('BAIK')
   const [returnNotes, setReturnNotes] = useState('')
   const [CONDITIONS, setConditions] = useState(['BAIK', 'CUKUP', 'KURANG', 'RUSAK_RINGAN', 'RUSAK_BERAT'])
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 25
 
   useEffect(() => {
     fetchLoans()
@@ -23,9 +25,10 @@ function Pengembalian() {
   const fetchLoans = async () => {
     try {
       setLoading(true)
-      const res = await loansAPI.getAll({ status: 'DISETUJUI', limit: 50 })
-      const res2 = await loansAPI.getAll({ status: 'AKTIF', limit: 50 })
+      const res = await loansAPI.getAll({ status: 'DISETUJUI', limit: 100 })
+      const res2 = await loansAPI.getAll({ status: 'AKTIF', limit: 100 })
       setLoans([...(res.data || []), ...(res2.data || [])])
+      setCurrentPage(1)
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -41,6 +44,46 @@ function Pengembalian() {
     } catch (err) { toast.error('Gagal: ' + err.message) }
   }
 
+  const totalPages = Math.ceil(loans.length / perPage)
+  const safePage = Math.min(currentPage, totalPages || 1)
+  const paginatedLoans = loans.slice((safePage - 1) * perPage, safePage * perPage)
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+    const current = safePage
+    const total = totalPages
+    const pages = []
+    if (current > 3) pages.push(1)
+    if (current > 4) pages.push('...')
+    for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+    if (current < total - 3) pages.push('...')
+    if (current < total - 2) pages.push(total)
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({loans.length} data)</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => setCurrentPage(current - 1)} disabled={current <= 1}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+            ‹ Prev
+          </button>
+          {pages.map((p, i) =>
+            p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+              <button key={p} onClick={() => setCurrentPage(p)}
+                style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                  background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                {p}
+              </button>
+            )
+          )}
+          <button onClick={() => setCurrentPage(current + 1)} disabled={current >= total}
+            style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+            Next ›
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="asset-page">
       <div className="asset-page-header">
@@ -50,6 +93,7 @@ function Pengembalian() {
       <div className="asset-table-card">
         <div className="asset-table-header">
           <div><h3>Peminjaman Aktif</h3><p>Aset yang sedang dipinjam dan siap untuk dikembalikan</p></div>
+          <span className="asset-total">{loans.length} Data</span>
         </div>
         <div className="asset-table-wrapper">
           <table className="asset-table">
@@ -57,9 +101,9 @@ function Pengembalian() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>Memuat...</td></tr>
-              ) : loans.length === 0 ? (
+              ) : paginatedLoans.length === 0 ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>Tidak ada peminjaman aktif</td></tr>
-              ) : loans.map(loan => (
+              ) : paginatedLoans.map(loan => (
                 <tr key={loan.id}>
                   <td style={{ fontWeight: 600 }}>#{loan.id}</td>
                   <td>{loan.asset?.name || '-'}</td>
@@ -86,6 +130,7 @@ function Pengembalian() {
             </tbody>
           </table>
         </div>
+        {renderPagination()}
       </div>
 
       {showReturnModal && (

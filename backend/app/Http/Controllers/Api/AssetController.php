@@ -65,6 +65,9 @@ class AssetController extends Controller
             }
         }
 
+        // Always exclude disposed/released assets from main listing (they have their own page)
+        $query->whereNotIn('status', ['DIMUSNAHKAN', 'DILEPASKAN']);
+
         // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
@@ -854,6 +857,213 @@ class AssetController extends Controller
                 'conditionHistory' => $conditionHistories,
                 'statusHistory' => $statusHistories,
                 'transfers' => $transfers,
+            ]
+        ]);
+    }
+
+    // ===================================================================
+    //  PELEPASAN & PEMUSNAHAN
+    // ===================================================================
+
+    /**
+     * List disposed/released assets
+     */
+    public function disposedAssets(Request $request)
+    {
+        $query = Asset::disposed()->with(['unit', 'location', 'disposedBy', 'createdBy']);
+
+        // Search
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nama_barang', 'LIKE', "%{$search}%")
+                  ->orWhere('kode_barang', 'LIKE', "%{$search}%")
+                  ->orWhere('kode_register', 'LIKE', "%{$search}%")
+                  ->orWhere('merk', 'LIKE', "%{$search}%")
+                  ->orWhere('disposal_destination', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // Filter by disposal type
+        if ($request->has('disposal_type') && $request->disposal_type) {
+            $query->where('disposal_type', $request->disposal_type);
+        }
+
+        // Filter by status (DIMUSNAHKAN or DILEPASKAN)
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        $limit = $request->get('limit', 25);
+        $assets = $query->orderBy('disposed_at', 'desc')->paginate($limit);
+
+        return response()->json([
+            'success' => true,
+            'data' => $assets->items(),
+            'pagination' => [
+                'total' => $assets->total(),
+                'page' => $assets->currentPage(),
+                'limit' => $assets->perPage(),
+                'totalPages' => $assets->lastPage()
+            ]
+        ]);
+    }
+
+    /**
+     * Dispose or release an asset
+     * disposal_type: DIMUSNAHKAN or DILEPASKAN
+     * Requires file upload for 'bukti' (PDF/image, max 10MB)
+     */
+    public function dispose(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'disposal_type' => 'required|in:DIMUSNAHKAN,DILEPASKAN',
+            'disposal_reason' => 'required|string|max:1000',
+            'disposal_date' => 'required|date',
+            'disposal_destination' => 'nullable|string|max:255',
+            'bukti' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $asset = Asset::find($id);
+        if (!$asset) {
+            return response()->json(['success' => false, 'message' => 'Aset tidak ditemukan'], 404);
+        }
+
+        // Cannot dispose assets that are currently on loan
+        $hasActiveLoans = $asset->loans()->whereIn('status', ['AKTIF', 'DISETUJUI'])->exists();
+        if ($hasActiveLoans) {
+            return response()->json(['success' => false, 'message' => 'Tidak dapat melepaskan/memusnahkan aset yang sedang dipinjam'], 400);
+        }
+
+        // Cannot dispose assets already disposed
+        if (in_array($asset->status, ['DIMUSNAHKAN', 'DILEPASKAN'])) {
+            return response()->json(['success' => false, 'message' => 'Aset sudah dilepaskan/dimusnahkan sebelumnya'], 400);
+        }
+
+        $user = auth()->user();
+        $disposalType = $request->disposal_type;
+        $label = $disposalType === 'DIMUSNAHKAN' ? 'dimusnahkan' : 'dilepaskan';
+
+        // Handle file upload for bukti
+        $documentPath = null;
+        if ($request->hasFile('bukti')) {
+            $file = $request->file('bukti');
+            $filename = 'bukti_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads/disposal'), $filename);
+            $documentPath = '/uploads/disposal/' . $filename;
+        }
+
+        $asset->update([
+            'status' => $disposalType,
+            'disposal_type' => $disposalType,
+            'disposal_date' => $request->disposal_date,
+            'disposal_reason' => $request->disposal_reason,
+            'disposal_destination' => $request->disposal_destination,
+            'disposal_document' => $documentPath,
+            'disposed_by_id' => $user->id,
+            'disposed_at' => now(),
+            'is_borrowable' => false,
+            'updated_by_id' => $user->id,
+        ]);
+
+        StatusHistory::create([
+            'asset_id' => $asset->id,
+            'status' => $disposalType,
+            'notes' => "Aset {$label}: {$request->disposal_reason}" . ($request->disposal_destination ? " → {$request->disposal_destination}" : ''),
+            'changed_by' => $user->id,
+            'changed_at' => now(),
+        ]);
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => $disposalType === 'DIMUSNAHKAN' ? 'DESTROY_ASSET' : 'RELEASE_ASSET',
+            'entity' => 'Asset',
+            'entity_id' => $asset->id,
+            'description' => "{$user->name} {$label} aset {$asset->nama_barang}" . ($request->disposal_destination ? " ke {$request->disposal_destination}" : ''),
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Aset berhasil {$label}",
+            'data' => $asset->load(['unit', 'disposedBy'])
+        ]);
+    }
+
+    /**
+     * Get comprehensive asset activity logs (Log Barang)
+     * Returns ALL logs related to assets — direct asset changes, loans, transfers, claims, etc.
+     */
+    public function assetLogs(Request $request)
+    {
+        $query = ActivityLog::with('user')
+            ->where(function($q) {
+                // Include all asset-related logs
+                $q->where('entity', 'Asset')
+                  // Also include loan logs (they reference assets in description)
+                  ->orWhere('entity', 'Loan');
+            })
+            ->orderBy('created_at', 'desc');
+
+        // Filter by specific asset
+        if ($request->has('asset_id') && $request->asset_id) {
+            $query->where('entity', 'Asset')->where('entity_id', $request->asset_id);
+        }
+
+        // Filter by action type
+        if ($request->has('action') && $request->action) {
+            $query->where('action', $request->action);
+        }
+
+        // Search
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('description', 'LIKE', "%{$search}%")
+                  ->orWhere('action', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $limit = $request->get('limit', 50);
+        $logs = $query->paginate($limit);
+
+        // Enrich with asset data where possible
+        $logItems = collect($logs->items())->map(function ($log) {
+            $logData = $log->toArray();
+            if ($log->entity === 'Asset' && $log->entity_id) {
+                $asset = Asset::select('id', 'nama_barang', 'kode_barang', 'kode_register', 'merk', 'tipe', 'kondisi', 'status', 'unit_id')
+                    ->with('unit:id,name')
+                    ->find($log->entity_id);
+                $logData['asset'] = $asset;
+            } elseif ($log->entity === 'Loan' && $log->entity_id) {
+                // Try to get asset info from loan
+                $loan = \App\Models\Loan::with(['asset:id,nama_barang,kode_barang,kode_register,merk,tipe,kondisi,status,unit_id', 'asset.unit:id,name', 'borrower:id,name'])
+                    ->select('id', 'asset_id', 'borrower_id', 'status')
+                    ->find($log->entity_id);
+                if ($loan && $loan->asset) {
+                    $logData['asset'] = $loan->asset;
+                    $logData['loan'] = [
+                        'id' => $loan->id,
+                        'status' => $loan->status,
+                        'borrower' => $loan->borrower?->name,
+                    ];
+                }
+            }
+            return $logData;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $logItems,
+            'pagination' => [
+                'total' => $logs->total(),
+                'page' => $logs->currentPage(),
+                'limit' => $logs->perPage(),
+                'totalPages' => $logs->lastPage()
             ]
         ]);
     }

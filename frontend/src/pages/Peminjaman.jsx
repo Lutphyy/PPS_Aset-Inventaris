@@ -16,15 +16,18 @@ function Peminjaman() {
   const [showDetail, setShowDetail] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(null)
+  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 })
 
   useEffect(() => { fetchLoans() }, [activeTab])
 
-  const fetchLoans = async () => {
+  const fetchLoans = async (page = 1) => {
     try {
       setLoading(true)
-      const params = activeTab !== 'Semua' ? { status: activeTab, limit: 50 } : { limit: 50 }
+      const params = { limit: 25, page }
+      if (activeTab !== 'Semua') params.status = activeTab
       const res = await loansAPI.getAll(params)
       setLoans(res.data || [])
+      setPagination(res.pagination || { total: res.data?.length || 0, page: 1, totalPages: 1 })
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -35,7 +38,7 @@ function Peminjaman() {
     try {
       await loansAPI.approve(id)
       toast.success('Peminjaman disetujui!')
-      fetchLoans()
+      fetchLoans(pagination.page)
     } catch (err) { toast.error('Gagal: ' + err.message) }
   }
 
@@ -46,7 +49,7 @@ function Peminjaman() {
       toast.success('Peminjaman ditolak')
       setShowRejectModal(null)
       setRejectReason('')
-      fetchLoans()
+      fetchLoans(pagination.page)
     } catch (err) { toast.error('Gagal: ' + err.message) }
   }
 
@@ -117,6 +120,42 @@ function Peminjaman() {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION */}
+        {pagination.totalPages > 1 && (() => {
+          const current = pagination.page
+          const total = pagination.totalPages
+          const pages = []
+          if (current > 3) pages.push(1)
+          if (current > 4) pages.push('...')
+          for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) pages.push(i)
+          if (current < total - 3) pages.push('...')
+          if (current < total - 2) pages.push(total)
+          return (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #eee' }}>
+              <span style={{ fontSize: '12px', color: '#888' }}>Halaman {current} dari {total} ({pagination.total} data)</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => fetchLoans(current - 1)} disabled={current <= 1}
+                  style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current <= 1 ? 'not-allowed' : 'pointer', opacity: current <= 1 ? 0.4 : 1 }}>
+                  ‹ Prev
+                </button>
+                {pages.map((p, i) =>
+                  p === '...' ? <span key={`e${i}`} style={{ padding: '5px 4px', fontSize: '12px', color: '#999' }}>…</span> : (
+                    <button key={p} onClick={() => fetchLoans(p)}
+                      style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, border: '1px solid #ddd', cursor: 'pointer',
+                        background: p === current ? '#7C57D6' : '#fff', color: p === current ? '#fff' : '#333' }}>
+                      {p}
+                    </button>
+                  )
+                )}
+                <button onClick={() => fetchLoans(current + 1)} disabled={current >= total}
+                  style={{ padding: '5px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #ddd', background: '#fff', cursor: current >= total ? 'not-allowed' : 'pointer', opacity: current >= total ? 0.4 : 1 }}>
+                  Next ›
+                </button>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Detail Modal */}

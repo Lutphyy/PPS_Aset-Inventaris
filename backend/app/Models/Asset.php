@@ -94,6 +94,15 @@ class Asset extends Model
         'claimed_at',
         'created_by_id',
         'updated_by_id',
+
+        // Disposal / Release fields
+        'disposal_type',
+        'disposal_date',
+        'disposal_reason',
+        'disposal_destination',
+        'disposal_document',
+        'disposed_by_id',
+        'disposed_at',
     ];
 
     protected $casts = [
@@ -115,6 +124,8 @@ class Asset extends Model
         'rental_price' => 'decimal:2',
         'is_borrowable' => 'boolean',
         'claimed_at' => 'datetime',
+        'disposal_date' => 'date',
+        'disposed_at' => 'datetime',
     ];
 
     // ===== Relationships =====
@@ -169,6 +180,11 @@ class Asset extends Model
         return $this->hasMany(AssetTransferRequest::class);
     }
 
+    public function disposedBy()
+    {
+        return $this->belongsTo(User::class, 'disposed_by_id');
+    }
+
     // ===== Scopes =====
 
     /** Aset di Gudang (belum diklaim unit manapun) */
@@ -212,6 +228,12 @@ class Asset extends Model
     public function scopeByStatus($query, $status)
     {
         return $query->where('status', $status);
+    }
+
+    /** Aset yang sudah dilepaskan atau dimusnahkan */
+    public function scopeDisposed($query)
+    {
+        return $query->whereIn('status', ['DIMUSNAHKAN', 'DILEPASKAN']);
     }
 
     // ===== Helpers =====

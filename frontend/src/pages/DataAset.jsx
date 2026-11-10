@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Eye, Pencil, Trash2, X, ArrowRightLeft, Upload, FileSpreadsheet, CheckCircle, XCircle, Package } from 'lucide-react'
-import { assetsAPI, assetRequestsAPI, unitsAPI, locationsAPI } from '../utils/api'
+import { assetsAPI, assetRequestsAPI, unitsAPI, locationsAPI, masterDataAPI } from '../utils/api'
 import { useToast } from '../components/ToastContext'
 
 const fmtIDR = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID')
@@ -61,6 +61,10 @@ function DataAset() {
   const [transferAsset, setTransferAsset] = useState(null)
   const [transferLocations, setTransferLocations] = useState([])
 
+  // Master data for dropdowns
+  const [masterConditions, setMasterConditions] = useState([])
+  const [masterStatuses, setMasterStatuses] = useState([])
+
   const defaultFormData = {
     // Identifikasi
     kode_register: '', no_urut: '', jenis_bmn: '', kode_satker: '', nama_satker: '',
@@ -92,7 +96,7 @@ function DataAset() {
     // Peminjaman / Sistem
     is_borrowable: false, rental_price: '', rental_unit: 'per_hari',
     // System
-    unit_id: '', location_id: '', notes: ''
+    unit_id: '', location_id: '', status: '', notes: ''
   }
 
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -101,7 +105,18 @@ function DataAset() {
   useEffect(() => {
     fetchAssets()
     fetchUnits()
+    fetchMasterData()
   }, [])
+
+  const fetchMasterData = async () => {
+    try {
+      const res = await masterDataAPI.getAll()
+      if (res.success) {
+        setMasterConditions(res.data.conditions || [])
+        setMasterStatuses(res.data.statuses || [])
+      }
+    } catch (err) { console.error(err) }
+  }
 
   const fetchUnits = async () => {
     try {
@@ -294,22 +309,9 @@ function DataAset() {
           <h1>{pageTitle}</h1>
           <p>{isOperator ? 'Kelola aset unit Anda' : 'Kelola seluruh aset dan inventaris BMN'}</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {canImport && (
-            <button type="button" className="add-asset-button"
-              style={{ background: 'linear-gradient(135deg, #149E93, #0d7a71)', border: 'none' }}
-              onClick={() => { setShowImport(true); setImportFile(null); setImportResult(null) }}>
-              <Upload size={17} strokeWidth={2} />
-              <span>Import Excel</span>
-            </button>
-          )}
-          {canAddAsset && (
-            <button type="button" className="add-asset-button" onClick={handleAdd}>
-              <Plus size={17} strokeWidth={2} />
-              <span>Tambah Aset</span>
-            </button>
-          )}
-        </div>
+        <span className="asset-total" style={{ background: '#e4f6f0', color: '#299579', padding: '8px 16px', borderRadius: '10px', fontWeight: 700 }}>
+          {pagination.total} Aset
+        </span>
       </div>
 
       {/* FILTERS */}
@@ -328,34 +330,21 @@ function DataAset() {
             </select>
           </div>
         )}
-        <div className="asset-filter">
-          <select value={filters.jenis_bmn} onChange={(e) => setFilters({ ...filters, jenis_bmn: e.target.value })}>
-            <option value="">Semua Jenis BMN</option>
-            <option value="MESIN PERALATAN NON TIK">Mesin Peralatan Non TIK</option>
-            <option value="ASET TETAP LAINNYA">Aset Tetap Lainnya</option>
-            <option value="MESIN PERALATAN KHUSUS TIK">Mesin Peralatan Khusus TIK</option>
-            <option value="INSTALASI DAN JARINGAN">Instalasi dan Jaringan</option>
-            <option value="BANGUNAN DAN GEDUNG">Bangunan dan Gedung</option>
-            <option value="KENDARAAN BERMOTOR">Kendaraan Bermotor</option>
-          </select>
-        </div>
+
         <div className="asset-filter">
           <select value={filters.kondisi} onChange={(e) => setFilters({ ...filters, kondisi: e.target.value })}>
             <option value="">Semua Kondisi</option>
-            <option value="Baik">Baik</option>
-            <option value="Rusak Ringan">Rusak Ringan</option>
-            <option value="Rusak Berat">Rusak Berat</option>
+            {masterConditions.map(c => (
+              <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+            ))}
           </select>
         </div>
         <div className="asset-filter">
           <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="">Semua Status</option>
-            <option value="GUDANG">Gudang</option>
-            <option value="TERSEDIA">Tersedia</option>
-            <option value="DIPINJAM">Dipinjam</option>
-            <option value="PROSES_TRANSFER">Proses Transfer</option>
-            <option value="DALAM_PERBAIKAN">Dalam Perbaikan</option>
-            <option value="RUSAK">Rusak</option>
+            {masterStatuses.map(s => (
+              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+            ))}
           </select>
         </div>
         <button className="add-asset-button" style={{ padding: '8px 14px' }} onClick={doSearch}>Cari</button>
@@ -749,22 +738,11 @@ function DataAset() {
                 // 0: Identifikasi
                 <SectionGrid key="tab0">
                   <FormField label="Nama Barang" name="nama_barang" required />
-                  <FormField label="Kode Register" name="kode_register" />
+                  <FormField label="Kode Register" name="kode_register" required />
                   <FormField label="Kode Barang" name="kode_barang" />
-                  <FormField label="NUP" name="nup" />
+                  <FormField label="NUP" name="nup" required />
                   <FormField label="No Urut" name="no_urut" type="number" />
-                  <FormField label="Jenis BMN" name="jenis_bmn">
-                    <select name="jenis_bmn" value={formData.jenis_bmn} onChange={handleInputChange}
-                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fafbff' }}>
-                      <option value="">Pilih Jenis</option>
-                      <option value="MESIN PERALATAN NON TIK">Mesin Peralatan Non TIK</option>
-                      <option value="ASET TETAP LAINNYA">Aset Tetap Lainnya</option>
-                      <option value="MESIN PERALATAN KHUSUS TIK">Mesin Peralatan Khusus TIK</option>
-                      <option value="INSTALASI DAN JARINGAN">Instalasi dan Jaringan</option>
-                      <option value="BANGUNAN DAN GEDUNG">Bangunan dan Gedung</option>
-                      <option value="KENDARAAN BERMOTOR">Kendaraan Bermotor</option>
-                    </select>
-                  </FormField>
+                  <FormField label="Jenis BMN" name="jenis_bmn" required />
                   <FormField label="Kode Satker" name="kode_satker" />
                   <FormField label="Nama Satker" name="nama_satker" />
                 </SectionGrid>,
@@ -776,9 +754,10 @@ function DataAset() {
                   <FormField label="Kondisi" name="kondisi">
                     <select name="kondisi" value={formData.kondisi} onChange={handleInputChange}
                       style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fafbff' }}>
-                      <option value="Baik">Baik</option>
-                      <option value="Rusak Ringan">Rusak Ringan</option>
-                      <option value="Rusak Berat">Rusak Berat</option>
+                      <option value="">Pilih Kondisi</option>
+                      {masterConditions.map(c => (
+                        <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+                      ))}
                     </select>
                   </FormField>
                   <FormField label="Umur Aset (tahun)" name="umur_aset" type="number" />
@@ -884,6 +863,15 @@ function DataAset() {
                 // 8: Sistem
                 <div key="tab8" style={{ display: 'grid', gap: '12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <FormField label="Status Aset" name="status">
+                      <select name="status" value={formData.status} onChange={handleInputChange}
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fafbff' }}>
+                        <option value="">Pilih Status</option>
+                        {masterStatuses.map(s => (
+                          <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                        ))}
+                      </select>
+                    </FormField>
                     {isAdmin && (
                       <>
                         <FormField label="Unit (kosongkan untuk Gudang)" name="unit_id">
